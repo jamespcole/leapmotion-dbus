@@ -1,0 +1,15 @@
+.DS_Store
+.*.swp
+*.bak
+node_modules
+*.idea
+docs
+/bin/
+
+/lib/dtrace/
+
+/share/
+
+/LICENSE
+
+/ChangeLog
