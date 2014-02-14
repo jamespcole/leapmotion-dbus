@@ -8,7 +8,8 @@ const ExtensionUtils = imports.misc.extensionUtils;
 const GLib = imports.gi.GLib;
 const Util = imports.misc.util;
 const AltTab = imports.ui.altTab;
-
+//const PanelMenu = imports.ui.panelMenu;
+//const PopupMenu = imports.ui.popupMenu;
 
 //const Main = imports.ui.main;
 //const Tweener = imports.tweener.tweener;
@@ -42,7 +43,8 @@ function _hideHello() {
     Main.uiGroup.remove_actor(text);
     text = null;
 }
-
+var monitor_height = 1080;
+var monitor_width = 1920;
 function _showHello() {
     if (!text) {
         text = new St.Label({ style_class: 'helloworld-label', text: "Hello, world!" });
@@ -55,6 +57,9 @@ function _showHello() {
 
     text.set_position(Math.floor(monitor.width / 2 - text.width / 2),
                       Math.floor(monitor.height / 2 - text.height / 2));
+
+    var monitor_height = monitor.height;
+	var monitor_width = monitor.width;
 
     Tweener.addTween(text,
                      { opacity: 0,
@@ -70,6 +75,9 @@ function init() {
                           x_fill: true,
                           y_fill: false,
                           track_hover: true });
+    /*for(var i in button) {
+      global.log(i);
+    }*/
     /*let icon = new St.Icon({ icon_name: 'system-run-symbolic',
                              style_class: 'system-status-icon' });*/
 	let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
@@ -129,6 +137,7 @@ function enable() {
     Main.overview.connect('showing', Lang.bind(this, function() {
         global.log('show overview');
         mode = 'overview';
+       // Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windowOverlays[1].border.show();//.getWindowOverlays());
     }));
     Main.overview.connect('hidden', Lang.bind(this, function() {
         global.log('hide overview');
@@ -140,7 +149,7 @@ function enable() {
         mode = '';
     }));*/
     //altTabExtension = imports.extensions.coverflowalttab;
-   /* for(var i in ExtensionUtils.extensions['CoverflowAltTab@palatis.blogspot.com'].imports.extension) {
+    /*for(var i in ExtensionUtils.extensions) {
       global.log(i);
     }*/
 
@@ -229,6 +238,19 @@ const LeapMotionIface = <interface name="com.jamespcole.leapmotion.dbus.Events">
  <arg type="i"/>
  <arg type="i"/>
 </signal>
+<signal name="LeapMotionKeyTap">
+ <arg type="s"/>
+</signal>
+<signal name="LeapMotionScreenTap">
+ <arg type="s"/>
+</signal>
+<signal name="LeapMotionPointerMove">
+ <arg type="i"/>
+ <arg type="i"/>
+ <arg type="i"/>
+</signal>
+<signal name="KeyTap">
+</signal>
 </interface>;
 
 const LeapMotionServerInfo  = Gio.DBusInterfaceInfo.new_for_xml(LeapMotionIface);
@@ -253,8 +275,8 @@ const LeapDBusEventSource = new Lang.Class({
         this._initialized = false;
         this._dbusProxy = new LeapMotionServer();
         this._dbusProxy.init_async(GLib.PRIORITY_DEFAULT, null, Lang.bind(this, function(object, result) {
-          global.log(object, result);
-          global.log('proxy init');
+         // global.log(object, result);
+          //global.log('proxy init');
             try {
                 this._dbusProxy.init_finish(result);
             } catch(e) {
@@ -272,6 +294,7 @@ const LeapDBusEventSource = new Lang.Class({
 			this._dbusProxy.connectSignal('SwipeUp', Lang.bind(this, this._onSwipeUp));
 			this._dbusProxy.connectSignal('SwipeLeft', Lang.bind(this, this._onSwipeLeft));
 			this._dbusProxy.connectSignal('SwipeRight', Lang.bind(this, this._onSwipeRight));
+			this._dbusProxy.connectSignal('LeapMotionPointerMove', Lang.bind(this, this._onLeapMotionPointerMove));
             //this.connect('LeapEvent', Lang.bind(this, this._onLeapEvent));
 
             /*this._dbusProxy.connect('notify::g-name-owner', Lang.bind(this, function() {
@@ -345,7 +368,15 @@ const LeapDBusEventSource = new Lang.Class({
       global.log('in mode ' + mode);
       if(mode == '') {
         if(to == 5) {
-           Main.overview.show();
+			Main.overview.show();
+			//global.log(Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[0]._windowOverlays);//.getWindowOverlays());
+			//Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windowOverlays[0].hide();//.getWindowOverlays());
+			let win = Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windows[0].metaWindow;
+			//Main.activateWindow(win, global.get_current_time());
+			//win._animateVisible();
+
+			global.log(Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windowOverlays);
+			global.log('selected wspace index',global.screen.get_active_workspace_index());
         }
         else if(to == 4) {
         	//this.emit('notify::switch-applications');
@@ -386,16 +417,11 @@ const LeapDBusEventSource = new Lang.Class({
 			Util.spawn(['xdotool', 'click', '4']);
 		}
 		else {
-		//if(fingers < 3) {
-			var scaled_val = Math.abs(distance / 15);
+			/*var scaled_val = Math.abs(distance / 15);
 			global.log('scaled value', scaled_val);
 			for(var i = 0; i < scaled_val; i++) {
 				Util.spawn(['xdotool', 'click', '4']);
-			}
-		/*}
-		else {
-
-		}*/
+			}*/
 		}
 	},
 
@@ -409,16 +435,11 @@ const LeapDBusEventSource = new Lang.Class({
 			Util.spawn(['xdotool', 'click', '5']);
 		}
 		else {
-		//if(fingers < 3) {
-			var scaled_val = Math.abs(distance / 15);
+			/*var scaled_val = Math.abs(distance / 15);
 			global.log('scaled value', scaled_val);
 			for(var i = 0; i < scaled_val; i++) {
 				Util.spawn(['xdotool', 'click', '5']);
-			}
-		/*}
-		else {
-
-		}*/
+			}*/
 		}
 	},
 
@@ -430,9 +451,18 @@ const LeapDBusEventSource = new Lang.Class({
 		var fingers = bits[1];
 		//Util.spawn(['xdotool', 'click', '4']);
 		//let tabPopup = new AltTab.AppSwitcherPopup();
+		global.log('swiped left in mode ' + mode);
+		if(mode != 'overview') {
+			let tabPopup = new AltTab.WindowSwitcherPopup();
+			tabPopup.show(false, 'switch-windows', Shell.KeyBindingMode.ALT);
+		}
+		else {
 
-		let tabPopup = new AltTab.WindowSwitcherPopup();
-		tabPopup.show(false, 'switch-windows', Shell.KeyBindingMode.ALT);
+			let win = Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windows[0].metaWindow;
+			//Main.activateWindow(win, global.get_current_time());
+			//win._animateVisible();
+			global.log('switch overlay', win);
+		}
 
 		//Main.ctrlAltTabManager.popup(false, 'switch-panels');
 
@@ -494,6 +524,55 @@ const LeapDBusEventSource = new Lang.Class({
 		}
 	},
 
+	_onLeapMotionPointerMove: function(proxy, sender, data) {
+
+		var str_result = String(data);
+		var bits = str_result.split(',');
+		var x = bits[0];
+		var y = bits[1];
+		var fingers = bits[2];
+
+		if(fingers == 1) {
+			global.log(monitor_width, monitor_height);
+			var x_scaled = Math.ceil(x * (monitor_width  / 256));
+			var y_scaled = Math.ceil(y * (monitor_height / 256));
+
+			global.log('pointer move', x_scaled, y_scaled, fingers);
+			//do it this way to smooth the cursor movement
+			//var scale_factor = (monitor_height + monitor_width) / 512;
+			//for(var i = 0; i < 2; i++) {
+				Util.spawn(['xdotool', 'mousemove_relative', '--', String(x_scaled), String(y_scaled)]);
+			//}
+		}
+		else if(fingers == 2) {
+			if(mode != 'overview') {
+				global.log(y);
+				var scale = y;
+				if(y < 0) {
+					scale = scale * -1;
+				}
+				global.log('scale', scale);
+				if(y < 0) {
+					//for(var i = 0; i < scale; i++) {
+						Util.spawn(['xdotool', 'click', '4']);
+					//}
+
+				}
+				else if(y > 0) {
+					//for(var i = 0; i < scale; i++) {
+						Util.spawn(['xdotool', 'click', '5']);
+					//}
+				}
+			}
+		}
+
+
+	},
+
+	_onKeyTap: function(proxy, sender, data) {
+		global.log('keytap');
+	},
+
     destroy: function() {
         this._dbusProxy.run_dispose();
     },
@@ -547,3 +626,76 @@ const EventSource = new LeapDBusEventSource();
 });
 
 const LPDbus = new LeapMotionDbus();*/
+
+
+/*const Indicator = new Lang.Class({
+    Name: 'LeapMotionIndicator',
+    Extends: PanelMenu.SystemStatusButton,
+
+    _init: function() {
+    	this.setIcon('bluetooth-disabled-symbolic');*/
+        /*this.parent('bluetooth-disabled-symbolic', _("Bluetooth"));
+
+        this._applet = new GnomeBluetoothApplet.Applet();
+
+        this._killswitch = new PopupMenu.PopupSwitchMenuItem(_("Bluetooth"), false);
+        this._applet.connect('notify::killswitch-state', Lang.bind(this, this._updateKillswitch));
+        this._killswitch.connect('toggled', Lang.bind(this, function() {
+            let current_state = this._applet.killswitch_state;
+            if (current_state != GnomeBluetooth.KillswitchState.HARD_BLOCKED &&
+                current_state != GnomeBluetooth.KillswitchState.NO_ADAPTER) {
+                this._applet.killswitch_state = this._killswitch.state ?
+                    GnomeBluetooth.KillswitchState.UNBLOCKED:
+                    GnomeBluetooth.KillswitchState.SOFT_BLOCKED;
+            } else
+                this._killswitch.setToggleState(false);
+        }));
+
+        this._discoverable = new PopupMenu.PopupSwitchMenuItem(_("Visibility"), this._applet.discoverable);
+        this._applet.connect('notify::discoverable', Lang.bind(this, function() {
+            this._discoverable.setToggleState(this._applet.discoverable);
+        }));
+        this._discoverable.connect('toggled', Lang.bind(this, function() {
+            this._applet.discoverable = this._discoverable.state;
+        }));
+
+        this._updateKillswitch();
+        this.menu.addMenuItem(this._killswitch);
+        this.menu.addMenuItem(this._discoverable);
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        this._fullMenuItems = [new PopupMenu.PopupSeparatorMenuItem(),
+                               new PopupMenu.PopupMenuItem(_("Send Files to Device…")),
+                               new PopupMenu.PopupMenuItem(_("Set Up a New Device…")),
+                               new PopupMenu.PopupSeparatorMenuItem()];
+        this._hasDevices = false;
+
+        this._fullMenuItems[1].connect('activate', function() {
+            GLib.spawn_command_line_async('bluetooth-sendto');
+        });
+        this._fullMenuItems[2].connect('activate', function() {
+            GLib.spawn_command_line_async('bluetooth-wizard');
+        });
+
+        for (let i = 0; i < this._fullMenuItems.length; i++) {
+            let item = this._fullMenuItems[i];
+            this.menu.addMenuItem(item);
+        }
+
+        this._deviceItemPosition = 3;
+        this._deviceItems = [];
+        this._applet.connect('devices-changed', Lang.bind(this, this._updateDevices));
+        this._updateDevices();
+
+        this._applet.connect('notify::show-full-menu', Lang.bind(this, this._updateFullMenu));
+        this._updateFullMenu();
+
+        this.menu.addSettingsAction(_("Bluetooth Settings"), 'gnome-bluetooth-panel.desktop');
+
+        this._applet.connect('pincode-request', Lang.bind(this, this._pinRequest));
+        this._applet.connect('confirm-request', Lang.bind(this, this._confirmRequest));
+        this._applet.connect('auth-request', Lang.bind(this, this._authRequest));
+        this._applet.connect('cancel-request', Lang.bind(this, this._cancelRequest));*/
+   /* }
+
+});*/

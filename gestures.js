@@ -8,9 +8,28 @@ var child;
 
 
 var controller = new Leap.Controller({enableGestures: true});
-//controller.on("frame", function(frame) {
+/*controller.on("frame", function(frame) {
   //console.log("Frame: " + frame.id + " @ " + frame.timestamp);
-//});
+  if(frame.pointables && frame.pointables.length) {
+		var point_threshold = 0.3;
+		var previous_frame = controller.frame(1);
+		var trans = frame.translation(previous_frame);
+		var x_val = trans[0];
+		var y_val = trans[1];
+
+		if((x_val > point_threshold || x_val < (point_threshold * -1)) && (y_val > point_threshold || y_val < (point_threshold * -1))) {
+			var x = Math.ceil(x_val);// * (1920 / 256);
+			var y = Math.ceil(y_val);// * (1080 / 256);
+			y = y * -1;//flip the y axis
+			console.log('move', x, y, x_val, y_val, frame.fingers.length);
+			console.log(frame.fingers);
+			//for some weird reason it is returning one finger even when using a fist so I'm using the debounced value
+			leapDbus.emit('LeapMotionPointerMove', x, y, current_fingers);
+
+		}
+  }
+
+});*/
 
 var fingers_count = 0;
 var frameCount = 0;
@@ -21,6 +40,7 @@ var fingers_arr = [];
 var fingers_index = 0;
 var max_fingers = 3;
 
+var current_fingers = 0;
 var previous_fingers = 0;
 
 controller.on('connect', function(){
@@ -39,11 +59,11 @@ controller.on('connect', function(){
 			if(fingers_index == max_fingers) {
 
 				fingers_index = 0;
-				console.log(fingers_count + ' fingers detected');
-
+				//console.log(fingers_count + ' fingers detected');
+				current_fingers = fingers_count;
 				if(fingers_count != 1) {//ignore single finger
 					if(previous_fingers != fingers_count) {
-
+						console.log('fingers changed from ' + previous_fingers + ' to ' + fingers_count);
 						leapDbus.emit('FingersChanged', [previous_fingers, fingers_count]);
 						previous_fingers = fingers_count;
 					}
@@ -58,11 +78,12 @@ controller.on('connect', function(){
 
 var swiper = controller.gesture('swipe');
 var tolerance = 50;
-var last_up_swipe = new Date().getTime()/1000;
-var last_down_swipe = new Date().getTime()/1000;
-var last_left_swipe = new Date().getTime()/1000;
-var last_right_swipe = new Date().getTime()/1000;
+var last_up_swipe = new Date().getTime();
+var last_down_swipe = new Date().getTime();
+var last_left_swipe = new Date().getTime();
+var last_right_swipe = new Date().getTime();
 var debounce_ms = 1000;
+var same_type_debounce_ms = 150;//this is for debouncing events of the same type that fire multiple times when using multiple fingers
 
 swiper.stop(function(g) {
 	if (Math.abs(g.translation()[0]) > tolerance || Math.abs(g.translation()[1]) > tolerance) {
@@ -79,60 +100,94 @@ swiper.stop(function(g) {
 		var direction_axis = (Math.abs(g.translation()[0]) > Math.abs(g.translation()[1])) ? 'x': 'y';
 
 		if(direction_axis == 'y') {
-			var scale_y = Math.abs(g.translation()[1]);
-			if(scale_y < 0) {
-				scale_y *= -1;
-			}
-			if(yDir == 1) {
-				if(last_up_swipe + debounce_ms > new Date().getTime()/1000) {
-					console.log('swipe down');
-					leapDbus.emit('SwipeDown', scale_y, fingers);
-					last_down_swipe = new Date().getTime();
+			//if((last_down_swipe + same_type_debounce_ms) < new Date().getTime()) {
+				var scale_y = Math.abs(g.translation()[1]);
+				if(scale_y < 0) {
+					scale_y *= -1;
 				}
-				else {
-					console.log('swipe down cancelled');
+				if(yDir == 1) {
+					if((last_down_swipe + same_type_debounce_ms) > new Date().getTime()) {
+						console.log('debounced down swipe');
+						return;
+					}
+					if(last_up_swipe + debounce_ms < new Date().getTime()) {
+						console.log('swipe down');
+						leapDbus.emit('SwipeDown', scale_y, fingers);
+						last_down_swipe = new Date().getTime();
+					}
+					else {
+						console.log('swipe down cancelled becuase there was a recent up swipe');
+					}
 				}
-			}
-			else if(yDir == -1){
-				if(last_down_swipe + debounce_ms > new Date().getTime()/1000) {
-					console.log('swipe up');
-					leapDbus.emit('SwipeUp', scale_y, fingers);
-					last_up_swipe = new Date().getTime();
-				}
-				else {
-					console.log('swipe up cancelled');
-				}
+				else if(yDir == -1){
+					if((last_up_swipe + same_type_debounce_ms) > new Date().getTime()) {
+						console.log('debounced up swipe');
+						return;
+					}
+					if(last_down_swipe + debounce_ms < new Date().getTime()) {
+						console.log('swipe up');
+						leapDbus.emit('SwipeUp', scale_y, fingers);
+						last_up_swipe = new Date().getTime();
+					}
+					else {
+						console.log('swipe up becuase there was a recent down swipe');
+					}
 
-			}
+				}
+			/*}
+			else {
+				console.log('debounced vertical swipe');
+			}*/
 		}
 		else {
-			var scale_x = Math.abs(g.translation()[0]);
-			if(scale_x < 0) {
-				scale_x *= -1;
-			}
-			if(xDir == 1) {
-				if(last_left_swipe + debounce_ms > new Date().getTime()/1000) {
-					console.log('swipe right');
-					leapDbus.emit('SwipeRight', scale_x, fingers);
+			//if((last_left_swipe + same_type_debounce_ms) < new Date().getTime() || (last_right_swipe + same_type_debounce_ms) < new Date().getTime()) {
+				/*if((last_left_swipe + same_type_debounce_ms) < new Date().getTime()) {
+					console.log('debounced left swipe');
+					return;
+				}
+				if((last_right_swipe + same_type_debounce_ms) < new Date().getTime()) {
+					console.log('debounced right swipe');
+					return;
+				}*/
+				var scale_x = Math.abs(g.translation()[0]);
+				if(scale_x < 0) {
+					scale_x *= -1;
+				}
+				if(xDir == 1) {
+					if((last_right_swipe + same_type_debounce_ms) > new Date().getTime()) {
+						console.log('debounced right swipe');
+						return;
+					}
+					if(last_left_swipe + debounce_ms < new Date().getTime()) {
+						console.log('swipe right');
+						leapDbus.emit('SwipeRight', scale_x, fingers);
 
-					last_right_swipe = new Date().getTime();
+						last_right_swipe = new Date().getTime();
+					}
+					else {
+						console.log('swipe right cancelled');
+					}
 				}
-				else {
-					console.log('swipe right cancelled');
-				}
-			}
-			else if(xDir == -1){
-				if(last_right_swipe + debounce_ms > new Date().getTime()/1000) {
-					console.log('swipe left');
-					leapDbus.emit('SwipeLeft', scale_x, fingers);
+				else if(xDir == -1){
+					if((last_left_swipe + same_type_debounce_ms) > new Date().getTime()) {
+						console.log('debounced left swipe');
+						return;
+					}
+					if(last_right_swipe + debounce_ms < new Date().getTime()) {
+						console.log('swipe left');
+						leapDbus.emit('SwipeLeft', scale_x, fingers);
 
-					last_left_swipe = new Date().getTime();
-				}
-				else {
-					console.log('swipe left cancelled');
-				}
+						last_left_swipe = new Date().getTime();
+					}
+					else {
+						console.log('swipe left cancelled');
+					}
 
-			}
+				}
+			/*}
+			else {
+				console.log('debounced horizontal swipe');
+			}*/
 		}
 
 		/*if(mode == 3) {
@@ -165,10 +220,66 @@ swiper.stop(function(g) {
 
 var tap = controller.gesture('screenTap');
 tap.stop(function(g) {
-	console.log('tap');
+	console.log('screen tap');
+	console.log(g.lastFrame.id);
 	//sendKeys('keyup alt');
 	//changeMode(0);
 });
+
+var key_tap = controller.gesture('keyTap');
+var last_key_tap = new Date().getTime();
+var key_tap_debounce = 150;
+key_tap.stop(function(g) {
+	//console.log(key_tap_debounce, last_key_tap, new Date().getTime());
+	if((last_key_tap + key_tap_debounce) < new Date().getTime()) {
+		//var xDir = Math.abs(g.translation()[0]) > tolerance ? (g.translation()[0] > 0 ? -1 : 1) : 0;
+		//var tolerance = 25;
+		//var yDir = Math.abs(g.translation()[1]) > tolerance ? (g.translation()[1] < 0 ? -1 : 1) : 0;
+
+		console.log('key tap');
+		last_key_tap = new Date().getTime();
+		leapDbus.emit('KeyTap', null, null);
+	}
+	else {
+		console.log('key tap debounced');
+	}
+	/*for(var i in g) {
+		console.log(i);
+	}*/
+	//console.log(g.lastGesture.id);
+	//console.log(g.lastFrame.id, g.id);
+	//sendKeys('keyup alt');
+	//changeMode(0);
+});
+
+var circle = controller.gesture('circle');
+circle.stop(function(g) {
+
+	var gesture = g.lastGesture;
+	var clockwise = false;
+	var progress = gesture.progress;
+	//console.log(gesture.pointableIds);
+	var pointableID = gesture.pointableIds[0];
+	if(pointableID && g.lastFrame.pointable(pointableID)) {
+
+		var direction =  g.lastFrame.pointable(pointableID).direction;
+		console.log(gesture.normal, direction);
+		if(direction !== undefined) { //this happens when a swipe occurs during the circle gesture
+			var dotProduct = Leap.vec3.dot(direction, gesture.normal);
+
+			if (dotProduct  >  0) {
+				clockwise = true;
+			}
+			var direction_str = (clockwise) ? 'clockwise' : 'anticlockwise';
+			console.log(direction_str + ' ' + progress + ' times', clockwise);
+		}
+		else {
+			console.log('circle direction could not be calculated');
+		}
+
+	}
+});
+
 
 //var connected;// = false;
 var lm_connected = false;
@@ -226,11 +337,17 @@ var leapmotionIface = {
         LeapMotionDisconnected: [],
         LeapMotionControllerConnected: [],
         LeapMotionControllerDisconnected: [],
+        LeapMotionKeyTap: ['s'],
+        LeapMotionScreenTap: ['s'],
+        //LeapMotionControllerDisconnected: [],
+        LeapMotionPointerMove: ['iii'],
         FingersChanged: [ 'ai', 'from_and_to' ],
         SwipeDown: ['ii'],
         SwipeUp: ['ii'],
         SwipeLeft: ['ii'],
-        SwipeRight: ['ii']
+        SwipeRight: ['ii'],
+        KeyTap: [],
+        ScreenTap: []
     },
     properties: {
        TestProperty: 'y'
@@ -254,6 +371,7 @@ var leapDbus = {
         console.log('signal emit', name, param1, param2);
     }
 };
+
 bus.exportInterface(leapDbus, '/com/jamespcole/leapmotion/dbus/Events', leapmotionIface);
 
 
