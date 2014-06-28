@@ -454,7 +454,8 @@ const LeapDBusEventSource = new Lang.Class({
 		global.log('swiped left in mode ' + mode);
 		if(mode != 'overview') {
 			let tabPopup = new AltTab.WindowSwitcherPopup();
-			tabPopup.show(false, 'switch-windows', Shell.KeyBindingMode.ALT);
+			tabPopup.show(false, 'switch-windows', Shell.KeyBindingMode.SHIFT);
+			//tabPopup.show(false, 'switch-windows');
 		}
 		else {
 

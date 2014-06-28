@@ -232,13 +232,31 @@ var key_tap_debounce = 150;
 key_tap.stop(function(g) {
 	//console.log(key_tap_debounce, last_key_tap, new Date().getTime());
 	if((last_key_tap + key_tap_debounce) < new Date().getTime()) {
+		/*console.log(g);
+		if(g.frames.length > 1) {
+			g.lastFrame.translation()
+		}*/
 		//var xDir = Math.abs(g.translation()[0]) > tolerance ? (g.translation()[0] > 0 ? -1 : 1) : 0;
 		//var tolerance = 25;
 		//var yDir = Math.abs(g.translation()[1]) > tolerance ? (g.translation()[1] < 0 ? -1 : 1) : 0;
 
-		console.log('key tap');
+		/*console.log('key tap');
 		last_key_tap = new Date().getTime();
-		leapDbus.emit('KeyTap', null, null);
+		leapDbus.emit('KeyTap', null, null);*/
+
+		last_key_tap = new Date().getTime();
+
+		//key taps and swipedown both trigger on the same gesture
+		//so handle it in the swipe down
+		setTimeout(function() {
+			if(last_down_swipe + 150 < new Date().getTime()) {
+				console.log('key tap');
+			}
+			else {
+				console.log('key tap cancelled because it was part of a swipe');
+			}
+
+		}, 100);
 	}
 	else {
 		console.log('key tap debounced');
