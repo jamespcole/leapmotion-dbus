@@ -5,7 +5,7 @@ This has only been tested on Ubuntu 14.04 but should work on other *nix systems 
 
 The Gnome Shell extension has only bee tested in gnome-shell 3.10.4 and will probably not work on older versions on gnome-shell.
 
-leapmotion-dbus sends the following dbus events published to the dbus interface "com.jamespcole.leapmotion.dbus.Events":
+leapmotion-dbus sends the following dbus events published to the dbus interface `com.jamespcole.leapmotion.dbus.Events`:
 
 _LeapMotionSwipeUp_
 + int scale - the size of the swipe on the y axis

@@ -92,13 +92,13 @@ const LeapMotionMenu = new Lang.Class({
         }));
       this.menu.addMenuItem(enablePointerItem);
 
-      let startServiceItem = new PopupMenu.PopupMenuItem(_("Start Service"));
+      /*let startServiceItem = new PopupMenu.PopupMenuItem(_("Start Service"));
       startServiceItem.connect('activate', Lang.bind(this, function() {
             _showText("Service Started");
         }));
       this.menu.addMenuItem(startServiceItem);
 
-      this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));
+      this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
 
       this.actor.show();
     },
@@ -139,8 +139,7 @@ function enable() {
     let showSignalId = Main.overview.connect('showing', Lang.bind(this, function() {
         debugLog('show overview');
         mode = 'overview';
-        leapMotionOverviewSelectionUsed = false;
-       // Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windowOverlays[1].border.show();//.getWindowOverlays());
+        leapMotionOverviewSelectionUsed = false;       
     }));
 
     connectedSignals.push({ obj: Main.overview, id: showSignalId });
@@ -535,44 +534,25 @@ const LeapDBusEventSource = new Lang.Class({
       if(mode == '') {
         if(to == 5) {
           Main.overview.show();
-          //let win = Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windows[0].metaWindow;
-
-          //global.log(Main.overview._viewSelector._workspacesDisplay._workspacesViews[0]._workspaces[global.screen.get_active_workspace_index()]._windowOverlays);
-          //global.log('selected wspace index',global.screen.get_active_workspace_index());
         }
         else if(to == 4) {
-          //this.emit('notify::switch-applications');
-          /*this.emit('notify::switch-windows');
-          global.log('switch apps');
-          var altTabExtension = ExtensionUtils.extensions['CoverflowAltTab@palatis.blogspot.com'].imports.switcher;
-          global.log(altTabExtension);*/
           debugLog('switch apps');
-          //Util.spawn(['xdotool', 'keyup', 'alt', 'keydown', 'alt', 'key', 'Tab']);
-          //mode = 'alt-tab';
           toggleAltTab(true);
         }
 
       }
       else if(mode == 'overview') {
-        if(to == 0) {
-          //Main.overview.hide();
+        if(to == 0) {          
           if(leapMotionOverviewSelectionUsed == true && Main.overview.viewSelector._workspacesDisplay._workspaces[0][currentWorkspaceIndex]._windowOverlays.length > 0) {            
             Main.activateWindow(Main.overview.viewSelector._workspacesDisplay._workspaces[0][currentWorkspaceIndex]._windowOverlays[currentWindowIndex]._windowClone.metaWindow);
           }
           else {
             Main.overview.hide();
           }    
-        }
-        else if(to == 4) {
-          //Main.overview.hide();
-          //Util.spawn(['xdotool', 'keyup', 'alt', 'keydown', 'alt', 'key', 'Tab']);
-          //mode = 'alt-tab';
-        }
+        }        
       }
       else if(mode == 'alt-tab') {
         if(to == 0) {
-          //Util.spawn(['xdotool', 'keyup', 'alt']);
-          //mode = '';
           toggleAltTab(false);
         }
       }
