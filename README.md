@@ -1,52 +1,54 @@
 #leapmotion-dbus
 
-Provides a nodejs script that translates LeapMotion events into dbus events.  It sends the following dbus events:
+Provides a nodejs script that translates LeapMotion events into dbus events.  
 
-* LeapMotionSwipeUp
-** int scale - the size of the swipe on the y axis
-** int fingers - the number of fingers used
+It sends the following dbus events published to the dbus interface "com.jamespcole.leapmotion.dbus.Events":
 
-* LeapMotionSwipeDown
-** int scale - the size of the swipe on the y axis
-** int fingers - the number of fingers used
+_LeapMotionSwipeUp_
++ int scale - the size of the swipe on the y axis
++ int fingers - the number of fingers used
 
-* LeapMotionSwipeLeft
-** int scale - the size of the swipe on the x axis
-** int fingers - the number of fingers used
+_LeapMotionSwipeDown_
++ int scale - the size of the swipe on the y axis
++ int fingers - the number of fingers used
 
-* LeapMotionSwipeRight
-** int scale - the size of the swipe on the x axis
-** int fingers - the number of fingers used
+_LeapMotionSwipeLeft_
++ int scale - the size of the swipe on the x axis
++ int fingers - the number of fingers used
 
-* LeapMotionKeyTap
-** int fingers - the number of fingers used
+_LeapMotionSwipeRight_
++ int scale - the size of the swipe on the x axis
++ int fingers - the number of fingers used
 
-* LeapMotionFingersChanged
-** int previous fingers - the number of fingers before the change
-** int current fingers - the number of fingers after the change
+_LeapMotionKeyTap_
++ int fingers - the number of fingers used
 
-* LeapMotionClockWise
-** decimal count - the number of time around
-** int fingers - the number of fingers used
+_LeapMotionFingersChanged_
++ int previous fingers - the number of fingers before the change
++ int current fingers - the number of fingers after the change
 
-* LeapMotionAntiClockWise
-** decimal count - the number of time around
-** int fingers - the number of fingers used
+_LeapMotionClockWise_
++ decimal count - the number of time around
++ int fingers - the number of fingers used
 
-* LeapMotionPointerMove - only sent when a single finger is used
-** decimal x position - the normalised x position of the pointer used
-** decimal y position - the normalised y position of the pointer used
-** int fingers - the number of fingers used
-** Note: if you are using normalised positions to calculate screen postition use the following formulas: (x = normalised_x * monitor_width) and (y = monitor_height - normalised_y * monitor_height)
+_LeapMotionAntiClockWise_
++ decimal count - the number of time around
++ int fingers - the number of fingers used
 
-* LeapMotionControllerConnected
-** sent when a leap motion device is detected 
+_LeapMotionPointerMove_ - only sent when a single finger is used
++ decimal x position - the normalised x position of the pointer used
++ decimal y position - the normalised y position of the pointer used
++ int fingers - the number of fingers used
++ Note: if you are using normalised positions to calculate screen postition use the following formulas: (x = normalised_x * monitor_width) and (y = monitor_height - normalised_y * monitor_height)
 
-* LeapMotionControllerDisconnected
-** sent when a leap motion device is disconnected
+_LeapMotionControllerConnected_
++ sent when a leap motion device is detected 
 
-*LeapMotionHeartbeat - sent every 20 seconds
-** bool connected - whether a leap motion device is connected
+_LeapMotionControllerDisconnected_
++ sent when a leap motion device is disconnected
+
+_LeapMotionHeartbeat_ - sent every 20 seconds
++ bool connected - whether a leap motion device is connected
 
 
 Still very much a work in progress but serves as a proof of concept.
@@ -65,20 +67,21 @@ The Gnome Shell extension is primarily designed to be used one handed and has th
 
 #Installation
 
-sudo cp com.jamespcole.leapmotion.dbus.Events.conf /etc/dbus-1/system.d/
+`sudo cp com.jamespcole.leapmotion.dbus.Events.conf /etc/dbus-1/system.d/`
+
 Install leap motion SDK
 
-npm install leapjs
+`npm install leapjs`
 
-npm install dbus-native
+`npm install dbus-native`
 
 For gnome shell integration
 
-sudo apt-get install xdotool
+`sudo apt-get install xdotool`
 
 Gnome Shell extension installation instuctions coming soon!
 
 # Running It
 Clone this repo and then run:
 
-node gestures.js
+`node gestures.js`
