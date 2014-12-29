@@ -1,8 +1,11 @@
 #leapmotion-dbus
 
-Provides a nodejs script that translates LeapMotion events into dbus events.  
+Provides a nodejs script that translates LeapMotion events into dbus events.  Dbus is supported on Linux, OSX and Unix as a way to send messages between different applications.  
+This has only been tested on Ubuntu 14.04 but should work on other *nix systems without modification.  It was developed using nodejs v0.10.33 but may work on other versions.
 
-It sends the following dbus events published to the dbus interface "com.jamespcole.leapmotion.dbus.Events":
+The Gnome Shell extension has only bee tested in gnome-shell 3.10.4 and will probably not work on older versions on gnome-shell.
+
+leapmotion-dbus sends the following dbus events published to the dbus interface "com.jamespcole.leapmotion.dbus.Events":
 
 _LeapMotionSwipeUp_
 + int scale - the size of the swipe on the y axis
@@ -67,6 +70,8 @@ The Gnome Shell extension is primarily designed to be used one handed and has th
 
 #Installation
 
+Better install instructions are coming soon including automated installation scripts, here are the basics for now:
+
 `sudo cp com.jamespcole.leapmotion.dbus.Events.conf /etc/dbus-1/system.d/`
 
 Install leap motion SDK
@@ -85,3 +90,24 @@ Gnome Shell extension installation instuctions coming soon!
 Clone this repo and then run:
 
 `node gestures.js`
+
+# Deveopment Notes
+
+To make things easier when working on the gnome shell extesntion after installing it delete the directory `~/.local/share/gnome-shell/extensions/leapmotion@jamespcole.gmail.com` and symlink the location to the extension directory in your cloned copy of the repo.
+
+When testing changes to the Gnome Shell extension restart Gnome to see changes by running the following:
+
+`gnome-shell --replace &`
+
+To enable debug output for the dbus script set the variable debug to true in gestures.js.
+
+To see debug messages for the Gnome Shell extension set the variables logToConsole and logToUI to true in extension.js.
+
+# Future Dev
+
+* Finish support for all leap motion gestures
+* Package the gnome shell extension
+* Create install scripts
+* General code cleanup
+* Hopefully remove the dependence on xdotool for gnome-shell alt-tab functionality
+* Create upstart script so gestures.js can run as a service on Ubuntu
