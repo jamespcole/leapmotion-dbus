@@ -16,6 +16,8 @@ const Overview = imports.ui.overview;
 const AltTab = imports.ui.altTab;
 const PopupMenu = imports.ui.popupMenu;
 const PanelMenu = imports.ui.panelMenu;
+const ModalDialog = imports.ui.modalDialog;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 
 let text, button, winInjections, workspaceInjections, workViewInjections, createdActors, connectedSignals;
@@ -92,13 +94,14 @@ const LeapMotionMenu = new Lang.Class({
         }));
       this.menu.addMenuItem(enablePointerItem);
 
-      /*let startServiceItem = new PopupMenu.PopupMenuItem(_("Start Service"));
-      startServiceItem.connect('activate', Lang.bind(this, function() {
-            _showText("Service Started");
+      let installServiceItem = new PopupMenu.PopupMenuItem(_("Install Leap Motion Service"));
+      installServiceItem.connect('activate', Lang.bind(this, function() {
+            let dialog = new LeapMotionInstallDialog();
+            dialog.open(global.get_current_time());
         }));
-      this.menu.addMenuItem(startServiceItem);
+      this.menu.addMenuItem(installServiceItem);
 
-      this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
+      /*this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
 
       this.actor.show();
     },
@@ -610,3 +613,83 @@ const LeapDBusEventSource = new Lang.Class({
 Signals.addSignalMethods(LeapDBusEventSource.prototype);
 
 const EventSource = new LeapDBusEventSource();
+
+
+const LeapMotionInstallDialog = new Lang.Class({
+    Name: 'LeapMotionInstallDialog',
+    Extends: ModalDialog.ModalDialog,
+
+    _init: function() {
+        this.parent({ styleClass: 'prompt-dialog' });
+
+        let mainContentBox = new St.BoxLayout({ style_class: 'prompt-dialog-main-layout',
+                                                vertical: false });
+        this.contentLayout.add(mainContentBox,
+                               { x_fill: true,
+                                 y_fill: true });
+
+        let icon = new St.Icon({ icon_name: 'dialog-password-symbolic' });
+        mainContentBox.add(icon,
+                           { x_fill:  true,
+                             y_fill:  false,
+                             x_align: St.Align.END,
+                             y_align: St.Align.START });
+
+        let messageBox = new St.BoxLayout({ style_class: 'prompt-dialog-message-layout',
+                                            vertical: true });
+        mainContentBox.add(messageBox,
+                           { y_align: St.Align.START });
+
+        let subjectLabel = new St.Label({ style_class: 'prompt-dialog-headline',
+                                            text: 'Install Leap Motion Service' });
+        messageBox.add(subjectLabel,
+                       { y_fill:  false,
+                         y_align: St.Align.START });
+
+        
+        let messageText = "This will install the required components for gnome-shell to work with your Leap Motion.\n\nThe following will be installed if they are not already present:\n\nleapd Service\nnodejs\ngit\nxdotool\nleapmotion-dbus service\n\n";
+        messageText += "\nYou may be prompted to enter your passowrd during installation.";
+        let descriptionLabel = new St.Label({ style_class: 'prompt-dialog-description',
+                                              text: messageText });
+        descriptionLabel.clutter_text.line_wrap = true;
+
+        messageBox.add(descriptionLabel,
+                       { y_fill:  true,
+                         y_align: St.Align.START,
+                         expand: true });
+        
+
+        this._okButton = { label:  _("Install"),
+                           action: Lang.bind(this, this._onOk),
+                           default: true
+                         };
+
+        this.setButtons([{ label: _("Cancel"),
+                           action: Lang.bind(this, this.cancel),
+                           key:    Clutter.KEY_Escape,
+                         },
+                         this._okButton]);
+    },
+
+    _updateOkButton: function() {
+        let valid = true;
+
+        this._okButton.button.reactive = valid;
+        this._okButton.button.can_focus = valid;
+    },
+
+    _onOk: function() {
+        let valid = true;
+        
+        if (valid) {
+          Util.spawn(['chmod', '+x', Me.path + '/install.sh']);
+          Util.spawn(['gnome-terminal', '-e', Me.path + '/install.sh']);
+            this.close(global.get_current_time());
+        }
+        // do nothing if not valid
+    },
+
+    cancel: function() {
+        this.close(global.get_current_time());
+    }
+});
