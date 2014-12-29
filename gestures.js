@@ -322,7 +322,7 @@ controller.on("frame", function(frame) {
 					leapDbus.emit('LeapMotionPointerMove', normalizedPosition[0], normalizedPosition[1], fingers);
 				}
 				else {
-					logToConsole('Debounced pointer move cumulative movements');
+					logToConsole('Debounced pointer move');
 				}
 			
 			}
