@@ -78,7 +78,7 @@ const LeapMotionMenu = new Lang.Class({
 
       this.actor.add_child(icon);
       this.StatusIcon = icon;
-      
+
       let enablePointerItem = new PopupMenu.PopupSwitchMenuItem(_('Pointer'), enablePointing);
   
       enablePointerItem.connect('toggled', Lang.bind(this, function() {
@@ -264,11 +264,11 @@ const LeapMotionIface = '<node> \
  <arg type="s"/> \
 </signal> \
 <signal name="LeapMotionClockWise"> \
- <arg type="i"/> \
+ <arg type="d"/> \
  <arg type="i"/> \
 </signal> \
 <signal name="LeapMotionAntiClockWise"> \
- <arg type="i"/> \
+ <arg type="d"/> \
  <arg type="i"/> \
 </signal> \
 <signal name="LeapMotionPointerMove"> \
@@ -451,7 +451,7 @@ const LeapDBusEventSource = new Lang.Class({
     var bits = str_result.split(',');
     var distance = bits[0];
     var fingers = bits[1];    
-    debugLog('Clockwise fingers == ' + fingers, null, true);
+    debugLog('Clockwise fingers == ' + fingers + ' distance == ' + distance, null, true);
     if(enablePointing && fingers == numberOfPointingFingers) {
       debugLog('cancelled because pointing is enabled', data);
       return;
@@ -488,7 +488,7 @@ const LeapDBusEventSource = new Lang.Class({
     var bits = str_result.split(',');
     var distance = bits[0];
     var fingers = bits[1];
-    debugLog('Anti Clockwise fingers == ' + fingers, null, true);
+    debugLog('Anti Clockwise fingers == ' + fingers + ' distance == ' + distance, null, true);
     if(enablePointing && fingers == numberOfPointingFingers) {
       debugLog('cancelled because pointing is enabled', data);
       return;

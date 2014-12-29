@@ -375,8 +375,8 @@ var leapmotionIface = {
         LeapMotionSwipeUp: ['ii'],
         LeapMotionSwipeLeft: ['ii'],
         LeapMotionSwipeRight: ['ii'],
-        LeapMotionClockWise: ['ii'],
-        LeapMotionAntiClockWise: ['ii'],
+        LeapMotionClockWise: ['di'],
+        LeapMotionAntiClockWise: ['di'],
         KeyTap: [],
         ScreenTap: []
     },
