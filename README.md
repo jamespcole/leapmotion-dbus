@@ -91,7 +91,7 @@ Clone this repo and then run:
 
 `node gestures.js`
 
-# Deveopment Notes
+# Development Notes
 
 To make things easier when working on the gnome shell extesntion after installing it delete the directory `~/.local/share/gnome-shell/extensions/leapmotion@jamespcole.gmail.com` and symlink the location to the extension directory in your cloned copy of the repo.
 
