@@ -12,7 +12,7 @@ controller.on("frame", function(frame) {
 /*
 * Utility functions
 */
-var debug = true;
+var debug = false;
 function logToConsole(obj1, obj2) {
 	if(debug) {
 		if(obj2 !== "undefined") {
@@ -215,12 +215,11 @@ controller.on('connect', function(){
 			fingers_index++;
 			if(fingers_index == max_fingers) {
 
-				fingers_index = 0;
-				//console.log(fingers_count + ' fingers detected');
+				fingers_index = 0;				
 				current_fingers = fingers_count;
 				if(fingers_count != 1) {//ignore single finger
 					if(previous_fingers != fingers_count) {
-						console.log('fingers changed from ' + previous_fingers + ' to ' + fingers_count);
+						logToConsole('fingers changed from ' + previous_fingers + ' to ' + fingers_count);
 						leapDbus.emit('LeapMotionFingersChanged', [previous_fingers, fingers_count]);
 						previous_fingers = fingers_count;
 					}
@@ -229,7 +228,6 @@ controller.on('connect', function(){
 			}
 
 		}
-		//console.log(mode);
 	}, 100);
 });
 
@@ -244,12 +242,12 @@ circle.stop(function(g) {
 	var gesture = g.lastGesture;
 	var clockwise = false;
 	var progress = gesture.progress;
-	//console.log(gesture.pointableIds);
+	
 	var pointableID = gesture.pointableIds[0];
 	if(pointableID && g.lastFrame.pointable(pointableID)) {
 
 		var direction =  g.lastFrame.pointable(pointableID).direction;
-		console.log(gesture.normal, direction);
+		
 		if(direction !== undefined) { //this happens when a swipe occurs during the circle gesture
 			var dotProduct = Leap.vec3.dot(direction, gesture.normal);
 			var fingers = getFingerCount(g.lastFrame.fingers);
@@ -257,7 +255,7 @@ circle.stop(function(g) {
 				clockwise = true;
 			}
 			var direction_str = (clockwise) ? 'clockwise' : 'anticlockwise';
-			console.log(direction_str + ' ' + progress + ' times', clockwise);
+			logToConsole(direction_str + ' ' + progress + ' times', clockwise);
 			var debounce_time = (fingers > 2) ? circle_higher_debouce * fingers : same_type_debounce_ms;
 
 			if((last_circle + debounce_time) < new Date().getTime()) {
@@ -290,7 +288,7 @@ var pointer_move_debouce = 40;
 controller.on("frame", function(frame) {
   
   if(frame.pointables && frame.pointables.length) {
-		var point_threshold = 0.2;
+		var point_threshold = 0.1;
 		
 		var fingers = getFingerCount(frame.fingers);
 
@@ -308,8 +306,15 @@ controller.on("frame", function(frame) {
 			var stabilizedPosition = pointable.stabilizedTipPosition;
 			var interactionBox = frame.interactionBox;
 	        var normalizedPosition = interactionBox.normalizePoint(stabilizedPosition);
-			
-			if((normalizedPosition[0] > point_threshold || normalizedPosition[0] < (point_threshold * -1)) && (normalizedPosition[1] > point_threshold || normalizedPosition[1] < (point_threshold * -1))) {
+
+	        var previous_frame = controller.frame(1);
+			var trans = frame.translation(previous_frame);
+			var x_val = trans[0];
+			var y_val = trans[1];
+
+			//if((normalizedPosition[0] > point_threshold || normalizedPosition[0] < (point_threshold * -1)) && (normalizedPosition[1] > point_threshold || normalizedPosition[1] < (point_threshold * -1))) {
+
+			if((x_val > point_threshold || x_val < (point_threshold * -1)) && (y_val > point_threshold || y_val < (point_threshold * -1))) {
 
 				if((last_pointer_move + pointer_move_debouce) < new Date().getTime()) {
 					last_pointer_move = new Date().getTime();					
@@ -328,7 +333,7 @@ controller.on("frame", function(frame) {
 
 
 controller.on('deviceStreaming', function() {
-    console.log("deviceConnected");
+    logToConsole("deviceConnected");
     lm_connected = true;
 	leapDbus.emit('LeapMotionControllerConnected');
 });

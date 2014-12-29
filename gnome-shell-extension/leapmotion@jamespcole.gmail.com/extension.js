@@ -27,35 +27,37 @@ function resetState() {
     workViewInjections = { };
     createdActors = [ ];
     connectedSignals = [ ];
-    logToConsole = true;
+    logToConsole = false;
     logToUI = false;
-    enablePointing = true;
+    enablePointing = false;
     numberOfPointingFingers = 1;
 };
 
-function _hideHello() {
+function _hideText() {
     Main.uiGroup.remove_actor(text);
     text = null;
 }
 
-function _showHello() {
-    if (!text) {
-        text = new St.Label({ style_class: 'helloworld-label', text: "Hello, world!" });
-        Main.uiGroup.add_actor(text);
-    }
-
-    text.opacity = 255;
+function _showText(textStr) {
+    
+    let textLabel = new St.Label({ style_class: 'leapmotion-text-label', text: textStr });
+    Main.uiGroup.add_actor(textLabel);
+    
+    textLabel.opacity = 255;
 
     let monitor = Main.layoutManager.primaryMonitor;
 
-    text.set_position(Math.floor(monitor.width / 2 - text.width / 2),
-                      Math.floor(monitor.height / 2 - text.height / 2));
+    textLabel.set_position(Math.floor(monitor.width / 2 - textLabel.width / 2),
+                      Math.floor(monitor.height / 2 - textLabel.height / 2));
 
-    Tweener.addTween(text,
+    Tweener.addTween(textLabel,
                      { opacity: 0,
-                       time: 2,
+                       time: 5,
                        transition: 'easeOutQuad',
-                       onComplete: _hideHello });
+                       onComplete: function() {
+                        Main.uiGroup.remove_actor(textLabel);
+                       } 
+                     });
 }
 
 function init() {
@@ -76,11 +78,23 @@ const LeapMotionMenu = new Lang.Class({
 
       this.actor.add_child(icon);
       this.StatusIcon = icon;
+      
+      let enablePointerItem = new PopupMenu.PopupSwitchMenuItem(_('Pointer'), enablePointing);
+  
+      enablePointerItem.connect('toggled', Lang.bind(this, function() {
+            enablePointing = !enablePointing;
+            if(enablePointing) {
+              _showText("Pointing enabled, use a single finger to move the cursor.");
+            }
+            else {
+              _showText("Pointing disabled.");
+            }
+        }));
+      this.menu.addMenuItem(enablePointerItem);
 
-      //this.actor.add_child(icon);
       let startServiceItem = new PopupMenu.PopupMenuItem(_("Start Service"));
       startServiceItem.connect('activate', Lang.bind(this, function() {
-            _showHello();
+            _showText("Service Started");
         }));
       this.menu.addMenuItem(startServiceItem);
 
@@ -182,7 +196,7 @@ function debugLog(obj1, obj2, showOnUI) {
   }
   if(showOnUI && logToUI) {
     if (!text) {
-        text = new St.Label({ style_class: 'helloworld-label', text: obj1 });
+        text = new St.Label({ style_class: 'leapmotion-text-label', text: obj1 });
         Main.uiGroup.add_actor(text);
     }
 
@@ -197,7 +211,7 @@ function debugLog(obj1, obj2, showOnUI) {
                      { opacity: 0,
                        time: 2,
                        transition: 'easeOutQuad',
-                       onComplete: _hideHello });
+                       onComplete: _hideText });
   }
                     
 }
@@ -298,12 +312,7 @@ var leapMotionOverviewSelectionUsed = false;
 
 const LeapDBusEventSource = new Lang.Class({
     Name: 'LeapDBusEventSource',
-    //lm_connected: false,
-
     _init: function() {
-        //this._resetCache();
-        //this.isLoading = false;
-        //this.isDummy = false;
 
         this._initialized = false;
         this._dbusProxy = new LeapMotionServer();
@@ -328,20 +337,10 @@ const LeapDBusEventSource = new Lang.Class({
         this._dbusProxy.connectSignal('LeapMotionControllerDisconnected', Lang.bind(this, this._onLeapMotionControllerDisconnected));
         this._dbusProxy.connectSignal('LeapMotionHeartbeat', Lang.bind(this, this._onLeapMotionHeartbeat));
         this._dbusProxy.connectSignal('LeapMotionPointerMove', Lang.bind(this, this._onLeapMotionPointerMove));
-        /*this._dbusProxy.connectSignal('testsignal', Lang.bind(this, this._onChanged));
-        this._dbusProxy.connectSignal('LeapMotionHeartbeat', Lang.bind(this, this._onLeapMotionHeartbeat));
-        this._dbusProxy.connectSignal('LeapMotionConnected', Lang.bind(this, this._onLeapMotionConnected));
-        this._dbusProxy.connectSignal('LeapMotionDisconnected', Lang.bind(this, this._onLeapMotionDisconnected));
-        this._dbusProxy.connectSignal('LeapMotionControllerConnected', Lang.bind(this, this._onLeapMotionControllerConnected));
-        this._dbusProxy.connectSignal('FingersChanged', Lang.bind(this, this._onFingersChanged));
-        this._dbusProxy.connectSignal('SwipeDown', Lang.bind(this, this._onSwipeDown));
-      this._dbusProxy.connectSignal('SwipeUp', Lang.bind(this, this._onSwipeUp));
-      this._dbusProxy.connectSignal('SwipeLeft', Lang.bind(this, this._onSwipeLeft));
-      this._dbusProxy.connectSignal('SwipeRight', Lang.bind(this, this._onSwipeRight));
-      this._dbusProxy.connectSignal('LeapMotionPointerMove', Lang.bind(this, this._onLeapMotionPointerMove));*/
-           
-            this._initialized = true;
-        }));
+  
+        this._initialized = true;
+
+      }));
     },
 
   _onLeapMotionKeyTap: function(proxy, sender, data) {
@@ -588,8 +587,6 @@ const LeapDBusEventSource = new Lang.Class({
       var y = bits[1];
       var fingers = bits[2];
 
-      global.log(bits);
-
       if(enablePointing && fingers == numberOfPointingFingers) {
 
         let monitor = Main.layoutManager.primaryMonitor;
@@ -597,10 +594,8 @@ const LeapDBusEventSource = new Lang.Class({
         var monitor_height = monitor.height;
         var monitor_width = monitor.width;
         
-        Util.spawn(['xdotool', 'mousemove', '--', String(Math.ceil(x * monitor_width)), String(Math.ceil(monitor_height - y * monitor_height))]);
-        
+        Util.spawn(['xdotool', 'mousemove', '--', String(Math.round(x * monitor_width)), String(Math.round(monitor_height - y * monitor_height))]);        
       }
-
     },
 
     _onLeapMotionControllerDisconnected: function(proxy, sender, data) {
