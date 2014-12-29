@@ -156,6 +156,25 @@ function install_global_npm_package {
 }
 
 
+function install_leapmotion_dbus_service {
+
+	if [ ! -d "/etc/leapmotion-dbus" ]; then
+		sudo mkdir -p /etc/leapmotion-dbus
+		print_info "Downloading from git..."
+		sudo git clone https://github.com/jamespcole/leapmotion-dbus.git /etc/leapmotion-dbus
+	else
+		print_info "Stopping leapmotion-dbus service..."
+		service leapmotion-dbus stop
+		print_info "Downloading latest from git..."
+		(cd /etc/leapmotion-dbus && git pull origin master)
+	fi
+	
+	if [ ! -f "/etc/init/leapmotion-dbus.conf" ]; then
+		print_info "Installing upstart script..."
+		cp -f /etc/leapmotion-dbus/scripts/leapmotion-dbus.conf /etc/init/leapmotion-dbus.conf
+	fi	
+}
+
 function install_nodejs {
 	require_command_from_repo "nodejs" "nodejs" "ppa:chris-lea/node.js" result
 	if [ ! -f "/usr/bin/node" ]; then
@@ -205,6 +224,14 @@ require_command "git" "git" result
 install_leap_motion
 
 require_command "xdotool" "xdotool" result
+
+install_global_npm_package "forever" "forever" result
+
+install_leapmotion_dbus_service
+
+print_info "Restarting leapmotion-dbus service..."
+
+service leapmotion-dbus restart
 
 print_success "\n\nInstallation complete."
 
