@@ -126,7 +126,9 @@ const LeapMotionMenu = new Lang.Class({
 
       this.checkForPrerequisites(true);
 
-      
+      this._advancedOptionsSeparator = new PopupMenu.PopupSeparatorMenuItem();
+      this.menu.addMenuItem(this._advancedOptionsSeparator);
+
       this._forceUpdateServiceItem = new PopupMenu.PopupMenuItem(_("Force Installing Updates"));
       this._forceUpdateServiceItem.connect('activate', Lang.bind(this, function() {            
             installUpdates(function(success) {
@@ -165,12 +167,13 @@ const LeapMotionMenu = new Lang.Class({
               }
             });
         }));
-      this.menu.addMenuItem(this._stopServiceItem);
+      this.menu.addMenuItem(this._stopServiceItem);      
 
       if(!showAdvancedMenuItems) {
         this._forceUpdateServiceItem.actor.hide();
         this._startServiceItem.actor.hide();
         this._stopServiceItem.actor.hide();
+        this._advancedOptionsSeparator.hide();
       }      
 
       this.startTimer();
