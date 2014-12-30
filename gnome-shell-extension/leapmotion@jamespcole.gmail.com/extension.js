@@ -8,6 +8,7 @@ const Lang = imports.lang;
 const Gio = imports.gi.Gio;
 const Signals = imports.signals;
 const Util = imports.misc.util;
+const Mainloop = imports.mainloop;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 
@@ -21,7 +22,7 @@ const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 
 let text, button, winInjections, workspaceInjections, workViewInjections, createdActors, connectedSignals;
-let logToConsole, logToUI, enablePointing, numberOfPointingFingers;
+let logToConsole, logToUI, enablePointing, numberOfPointingFingers, showAdvancedMenuItems;
 let leapmotionProcess;
 
 function resetState() {
@@ -34,6 +35,7 @@ function resetState() {
     logToUI = false;
     enablePointing = false;
     numberOfPointingFingers = 1;
+    showAdvancedMenuItems = true;
 };
 
 function _hideText() {
@@ -122,14 +124,63 @@ const LeapMotionMenu = new Lang.Class({
       this.checkForPrerequisites(true);
 
       
+      this._forceUpdateServiceItem = new PopupMenu.PopupMenuItem(_("Force Installing Updates"));
+      this._forceUpdateServiceItem.connect('activate', Lang.bind(this, function() {            
+            installUpdates(function(success) {
+              if(!success) {
+                _showText("Update installation failed!");
+              }
+              else {
+                _showText("Updated leapmotion service successfully.");                
+              }
+            });
+        }));
+      this.menu.addMenuItem(this._forceUpdateServiceItem);
 
+      this._startServiceItem = new PopupMenu.PopupMenuItem(_("Start Service"));
+      this._startServiceItem.connect('activate', Lang.bind(this, function() {            
+            runHelper('start_service', function(success) {
+              if(!success) {
+                _showText("Could not start service!");
+              }
+              else {
+                _showText("Started service successfully.");                
+              }
+            });
+        }));
+      this.menu.addMenuItem(this._startServiceItem);
+
+      this._stopServiceItem = new PopupMenu.PopupMenuItem(_("Stop Service"));
+      this._stopServiceItem.connect('activate', Lang.bind(this, function() {            
+            runHelper('stop_service', function(success) {
+              if(!success) {
+                _showText("Could not stop service!");
+              }
+              else {
+                _showText("Stopped service successfully.");    
+                button.checkLeapConnection();
+              }
+            });
+        }));
+      this.menu.addMenuItem(this._stopServiceItem);
+
+      if(!showAdvancedMenuItems) {
+        this._forceUpdateServiceItem.actor.hide();
+        this._startServiceItem.actor.hide();
+        this._stopServiceItem.actor.hide();
+      }      
+
+      this.startTimer();
       /*this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
 
       this.actor.show();
     },
 
     destroy: function() {
-
+        if (this._timerId > 0) {
+            Mainloop.source_remove(this._timerId);
+            this._timerId = 0;
+        }
         this.parent();
     },
 
@@ -175,11 +226,29 @@ const LeapMotionMenu = new Lang.Class({
 
           if(!upToDate) {            
             button._updateServiceItem.actor.show();
+            button._forceUpdateServiceItem.actor.hide();
           }
           else {
             button._updateServiceItem.actor.hide();
+            if(showAdvancedMenuItems) {
+              button._forceUpdateServiceItem.actor.show();
+            }
           }
         });
+    },
+
+    startTimer: function() {
+      this._timerId = Mainloop.timeout_add_seconds(120, Lang.bind(this,
+            function() {
+                this.checkLeapConnection();
+                return true;                
+            }));
+    },
+
+    checkLeapConnection: function() {
+      runHelper('service_running', function(running) {
+        button.setStatusIcon(running);
+      });
     }
     
 });
@@ -812,6 +881,31 @@ function installUpdates(callback) {
           checkForUpdates(function(upToDate) {            
             callback(upToDate);
           });          
+        }
+            
+    });
+}
+
+
+function runHelper(name, callback) {
+  let [success, pid] = GLib.spawn_async(Me.path,
+            [Me.path + '/helpers.sh', name],
+            null,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+
+    if (!success) {
+        callback(false);
+        return;
+    }
+
+    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
+        GLib.spawn_close_pid(pid);
+        if (status != 0) {
+          callback(false);
+        }            
+        else {                   
+          callback(true);          
         }
             
     });
