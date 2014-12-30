@@ -101,16 +101,20 @@ const LeapMotionMenu = new Lang.Class({
             dialog.open(global.get_current_time());
         }));
       this.menu.addMenuItem(this._installServiceItem);
+      
 
-      //check to see if everything we need is installed
-      checkPrerequisites(function(hasPrerequisites) {           
-          if(!hasPrerequisites) {            
-            
-          }
-          else {
-            button._installServiceItem.actor.hide();
-          }
-        });
+      this._updateServiceItem = new PopupMenu.PopupMenuItem(_("Install Updates"));
+      this._updateServiceItem.connect('activate', Lang.bind(this, function() {
+            //let dialog = new LeapMotionInstallDialog();
+            //dialog.open(global.get_current_time());
+        }));
+      this.menu.addMenuItem(this._updateServiceItem);
+
+      this._updateServiceItem.actor.hide();
+
+      this.checkForPrerequisites(true);
+
+      
 
       /*this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
 
@@ -136,6 +140,39 @@ const LeapMotionMenu = new Lang.Class({
         this.StatusIcon = icon;
         this.actor.add_child(this.StatusIcon);
       }
+    },
+
+    checkForPrerequisites: function(checkUpdates) {
+      //check to see if everything we need is installed
+      checkPrerequisites(function(hasPrerequisites) {    
+          button._hasPrerequisites = hasPrerequisites;       
+          if(!hasPrerequisites) {            
+            button._installServiceItem.actor.show();
+          }
+          else {
+            button._installServiceItem.actor.hide();
+            if(checkUpdates) {
+              button.checkUpdates();
+            }
+          }
+        });
+    },
+
+    checkUpdates: function() {
+      checkForUpdates(function(upToDate) {  
+          button._upToDate = upToDate; 
+          if(!button._hasPrerequisites) {
+            button._updateServiceItem.actor.hide();
+            return;
+          }
+
+          if(!upToDate) {            
+            button._updateServiceItem.actor.show();
+          }
+          else {
+            button._updateServiceItem.actor.hide();
+          }
+        });
     }
     
 });
@@ -707,6 +744,27 @@ const LeapMotionInstallDialog = new Lang.Class({
 function checkPrerequisites(callback) {
   let [success, pid] = GLib.spawn_async(Me.path,
             [Me.path + '/install.sh', 'prereqs_check'],
+            null,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+
+    if (!success) {
+        callback(false);
+        return;
+    }
+
+    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
+        GLib.spawn_close_pid(pid);
+        if (status != 0)
+            callback(false);
+        else
+            callback(true);
+    });
+}
+
+function checkForUpdates(callback) {
+  let [success, pid] = GLib.spawn_async(Me.path,
+            [Me.path + '/install.sh', 'update_check'],
             null,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);

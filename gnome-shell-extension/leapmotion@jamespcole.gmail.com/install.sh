@@ -258,29 +258,39 @@ if [ $1 = 'prereqs_check' ]; then
 		exit 1
 	fi
 
-	checkCommandExists "notReal" result
+	checkCommandExists "git" result
 	if [ $result = 'false' ]; then
 		exit 1
 	fi
 
+	checkCommandExists "xdotool" result
+	if [ $result = 'false' ]; then
+		exit 1
+	fi
+
+	if [ ! -f "$install_dir/gestures.js" ]; then
+		exit 1
+	fi	
+
+	# checkCommandExists "notReal" result
+	# if [ $result = 'false' ]; then
+	# 	exit 1
+	# fi
+
 	exit 0
 elif [ $1 = 'update_check' ]; then
 
-	cd $install_dir
-
-	LOCAL=$(git rev-parse @)
-	REMOTE=$(git rev-parse @{u})
-	BASE=$(git merge-base @ @{u})
-
-	if [ $LOCAL = $REMOTE ]; then
-	    echo "Up-to-date"
-	elif [ $LOCAL = $BASE ]; then
-	    echo "Need to pull"
-	elif [ $REMOTE = $BASE ]; then
-	    echo "Need to push"
-	else
-	    echo "Diverged"
+	if [ ! -d "$install_dir" ]; then
+		exit 0
 	fi
+
+	cd "$install_dir"
+
+	git fetch
+
+	DIFF_COUNT=$(git rev-list HEAD...origin/master --count @)
+
+	exit $DIFF_COUNT
 else
 	print_success "Installing required components...\n\n"
 
