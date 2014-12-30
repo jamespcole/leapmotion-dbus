@@ -81,6 +81,8 @@ const LeapMotionMenu = new Lang.Class({
       let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
                                style_class: 'system-status-icon' });
 
+      this._connected = false;
+
       this.actor.add_child(icon);
       this.StatusIcon = icon;
 
@@ -130,7 +132,8 @@ const LeapMotionMenu = new Lang.Class({
       this.menu.addMenuItem(this._advancedOptionsSeparator);
 
       this._forceUpdateServiceItem = new PopupMenu.PopupMenuItem(_("Force Installing Updates"));
-      this._forceUpdateServiceItem.connect('activate', Lang.bind(this, function() {            
+      this._forceUpdateServiceItem.connect('activate', Lang.bind(this, function() {     
+            button.toggleIconTemporarily('document-save-symbolic', true);
             installUpdates(function(success) {
               if(!success) {
                 _showText("Update installation failed!");
@@ -138,6 +141,7 @@ const LeapMotionMenu = new Lang.Class({
               else {
                 _showText("Updated leapmotion service successfully.");                
               }
+              button.toggleIconTemporarily('document-save-symbolic', false);
             });
         }));
       this.menu.addMenuItem(this._forceUpdateServiceItem);
@@ -191,17 +195,38 @@ const LeapMotionMenu = new Lang.Class({
     },
 
     setStatusIcon: function(connected) {
-      this.actor.remove_child(this.StatusIcon);
-      if(connected) {
-        let icon = new St.Icon({ icon_name: 'system-run-symbolic',
-                                 style_class: 'system-status-icon' });
-        this.StatusIcon = icon;
+      if(this._connected != connected) {
+        this._connected = connected;
+        this.actor.remove_child(this.StatusIcon);
+        if(connected) {
+          /*let icon = new St.Icon({ icon_name: 'system-run-symbolic',
+                                   style_class: 'system-status-icon' });*/
+          let icon = new St.Icon({ icon_name: 'emblem-system-symbolic',
+                                   style_class: 'system-status-icon' });
+          this.StatusIcon = icon;
+          this.actor.add_child(this.StatusIcon);
+        }
+        else {
+          let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
+                                   style_class: 'system-status-icon' });
+          this.StatusIcon = icon;
+          this.actor.add_child(this.StatusIcon);
+        }
+      }      
+    },
+
+    toggleIconTemporarily: function(name, toggleOn) {
+      if(toggleOn) {
+        this.actor.remove_child(this.StatusIcon);
+        this._previousIcon = this.StatusIcon;
+
+        this._temporaryIcon = new St.Icon({ icon_name: name, style_class: 'system-status-icon' });
+        this.StatusIcon = this._temporaryIcon;
         this.actor.add_child(this.StatusIcon);
       }
       else {
-        let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
-                                 style_class: 'system-status-icon' });
-        this.StatusIcon = icon;
+        this.actor.remove_child(this._temporaryIcon);
+        this.StatusIcon = this._previousIcon;
         this.actor.add_child(this.StatusIcon);
       }
     },
