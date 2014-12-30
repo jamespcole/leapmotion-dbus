@@ -22,6 +22,7 @@ const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 let text, button, winInjections, workspaceInjections, workViewInjections, createdActors, connectedSignals;
 let logToConsole, logToUI, enablePointing, numberOfPointingFingers;
+let leapmotionProcess;
 
 function resetState() {
     winInjections = { };
@@ -94,12 +95,22 @@ const LeapMotionMenu = new Lang.Class({
         }));
       this.menu.addMenuItem(enablePointerItem);
 
-      let installServiceItem = new PopupMenu.PopupMenuItem(_("Install Leap Motion Service"));
-      installServiceItem.connect('activate', Lang.bind(this, function() {
+      this._installServiceItem = new PopupMenu.PopupMenuItem(_("Install Leap Motion Service"));
+      this._installServiceItem.connect('activate', Lang.bind(this, function() {
             let dialog = new LeapMotionInstallDialog();
             dialog.open(global.get_current_time());
         }));
-      this.menu.addMenuItem(installServiceItem);
+      this.menu.addMenuItem(this._installServiceItem);
+
+      //check to see if everything we need is installed
+      checkPrerequisites(function(hasPrerequisites) {           
+          if(!hasPrerequisites) {            
+            
+          }
+          else {
+            button._installServiceItem.actor.hide();
+          }
+        });
 
       /*this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
 
@@ -154,7 +165,7 @@ function enable() {
     }));
 
     connectedSignals.push({ obj: Main.overview, id: hideSignalId });
-
+    //leapmotionProcess = Util.spawn([Me.path + '/start_leapmotion-dbus.sh']);
 }
 
 function removeInjection(object, injection, name) {
@@ -679,17 +690,37 @@ const LeapMotionInstallDialog = new Lang.Class({
     },
 
     _onOk: function() {
-        let valid = true;
         
-        if (valid) {
-          Util.spawn(['chmod', '+x', Me.path + '/install.sh']);
-          Util.spawn(['gnome-terminal', '-e', Me.path + '/install.sh']);
-            this.close(global.get_current_time());
-        }
-        // do nothing if not valid
+        Util.spawn(['chmod', '+x', Me.path + '/install.sh']);
+        Util.spawn(['gnome-terminal', '-e', Me.path + '/install.sh']);
+        this.close(global.get_current_time());
+          
+          
     },
 
     cancel: function() {
         this.close(global.get_current_time());
     }
 });
+
+
+function checkPrerequisites(callback) {
+  let [success, pid] = GLib.spawn_async(Me.path,
+            [Me.path + '/install.sh', 'prereqs_check'],
+            null,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+
+    if (!success) {
+        callback(false);
+        return;
+    }
+
+    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
+        GLib.spawn_close_pid(pid);
+        if (status != 0)
+            callback(false);
+        else
+            callback(true);
+    });
+}

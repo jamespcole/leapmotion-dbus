@@ -164,15 +164,36 @@ function install_leapmotion_dbus_service {
 		sudo git clone https://github.com/jamespcole/leapmotion-dbus.git /etc/leapmotion-dbus
 	else
 		print_info "Stopping leapmotion-dbus service..."
-		service leapmotion-dbus stop
+		sudo /etc/init.d/leapmotion-dbus stop
 		print_info "Downloading latest from git..."
-		(cd /etc/leapmotion-dbus && git pull origin master)
+		(cd /etc/leapmotion-dbus && sudo git pull origin master)
 	fi
 	
-	if [ ! -f "/etc/init/leapmotion-dbus.conf" ]; then
-		print_info "Installing upstart script..."
-		cp -f /etc/leapmotion-dbus/scripts/leapmotion-dbus.conf /etc/init/leapmotion-dbus.conf
+	if [ ! -f "/etc/init.d/leapmotion-dbus" ]; then
+		print_info "Installing init script..."
+		#sudo cp -f /etc/leapmotion-dbus/scripts/leapmotion-dbus.conf /etc/init/leapmotion-dbus.conf
+		sudo cp -f /etc/leapmotion-dbus/scripts/leapmotion-dbus /etc/init.d/
+		sudo chmod a+x /etc/init.d/leapmotion-dbus
+		sudo update-rc.d -f leapmotion-dbus remove
+		sudo update-rc.d leapmotion-dbus start 20 5 . stop 20 0 1 6 .
 	fi	
+}
+
+install_dir=~/.local/share/leapmotion-dbus	
+function install_leapmotion_dbus {
+	
+	if [ ! -d "$install_dir" ]; then
+		print_info "Installing leapmotion-dbus to $install_dir"
+		mkdir -p "$install_dir"
+		print_info "Downloading from git..."
+		git clone https://github.com/jamespcole/leapmotion-dbus.git "$install_dir"
+	else
+		print_info "Updating leapmotion-dbus..."
+		print_info "Killing already running processes..."
+		kill $(ps ux -u $USER -U $USER | grep '[g]estures.js' | awk '{print $2}') > /dev/null 2>&1
+		print_info "Downloading latest from git..."
+		(cd "$install_dir" && git pull origin master)
+	fi
 }
 
 function install_nodejs {
@@ -182,6 +203,18 @@ function install_nodejs {
 		sudo ln -s /usr/bin/nodejs /usr/bin/node
 	fi	
 	require_command "npm" "npm" result
+}
+
+function checkCommandExists {
+	local __resultvar=$2
+	
+	if command -v $1 >/dev/null 2>&1; then
+		local install_result='true'
+		eval $__resultvar="'$install_result'"
+	else
+		local install_result='false'
+		eval $__resultvar="'$install_result'"
+	fi
 }
 
 function print_success {
@@ -213,28 +246,75 @@ function print_text {
 	echo $1	
 }
 
-print_success "Installing required components...\n\n"
+if [ $1 = 'prereqs_check' ]; then
 
-require_command "add-apt-repository" "python-software-properties" result
+	checkCommandExists "node" result
+	if [ $result = 'false' ]; then
+		exit 1
+	fi
 
-install_nodejs
+	checkCommandExists "leapd" result
+	if [ $result = 'false' ]; then
+		exit 1
+	fi
 
-require_command "git" "git" result
+	checkCommandExists "notReal" result
+	if [ $result = 'false' ]; then
+		exit 1
+	fi
 
-install_leap_motion
+	exit 0
+elif [ $1 = 'update_check' ]; then
 
-require_command "xdotool" "xdotool" result
+	cd $install_dir
 
-install_global_npm_package "forever" "forever" result
+	LOCAL=$(git rev-parse @)
+	REMOTE=$(git rev-parse @{u})
+	BASE=$(git merge-base @ @{u})
 
-install_leapmotion_dbus_service
+	if [ $LOCAL = $REMOTE ]; then
+	    echo "Up-to-date"
+	elif [ $LOCAL = $BASE ]; then
+	    echo "Need to pull"
+	elif [ $REMOTE = $BASE ]; then
+	    echo "Need to push"
+	else
+	    echo "Diverged"
+	fi
+else
+	print_success "Installing required components...\n\n"
 
-print_info "Restarting leapmotion-dbus service..."
+	require_command "add-apt-repository" "python-software-properties" result
 
-service leapmotion-dbus restart
+	install_nodejs
 
-print_success "\n\nInstallation complete."
+	require_command "git" "git" result
 
-print_text "Hit ENTER to continue..."
+	install_leap_motion
 
-read
+	require_command "xdotool" "xdotool" result
+
+	#install_global_npm_package "forever" "forever" result
+
+	#install_leapmotion_dbus_service
+
+	#print_info "Restarting leapmotion-dbus service..."
+
+	#sudo /etc/init.d/leapmotion-dbus restart
+
+	install_leapmotion_dbus
+
+	print_info "Making start script executable and starting leapmotion-dbus..."
+
+	chmod +x "$( dirname "$0" )"/start_leapmotion-dbus.sh
+
+	"$( dirname "$0" )"/start_leapmotion-dbus.sh &
+
+	sleep 5
+
+	print_success "\n\nInstallation complete."
+
+	print_text "Hit ENTER to continue..."
+
+	read
+fi
