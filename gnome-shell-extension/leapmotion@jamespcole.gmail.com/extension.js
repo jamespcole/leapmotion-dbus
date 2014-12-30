@@ -735,8 +735,8 @@ const LeapMotionInstallDialog = new Lang.Class({
 
     _onOk: function() {
         
-        Util.spawn(['chmod', '+x', Me.path + '/install.sh']);
-        Util.spawn(['gnome-terminal', '-e', Me.path + '/install.sh']);
+        Util.spawn(['chmod', '+x', Me.path + '/helpers.sh']);
+        Util.spawn(['gnome-terminal', '-e', Me.path + '/helpers.sh']);
         this.close(global.get_current_time());
           
           
@@ -750,7 +750,7 @@ const LeapMotionInstallDialog = new Lang.Class({
 
 function checkPrerequisites(callback) {
   let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/install.sh', 'prereqs_check'],
+            [Me.path + '/helpers.sh', 'prereqs_check'],
             null,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);
@@ -771,7 +771,7 @@ function checkPrerequisites(callback) {
 
 function checkForUpdates(callback) {
   let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/install.sh', 'update_check'],
+            [Me.path + '/helpers.sh', 'update_check'],
             null,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);
@@ -793,7 +793,7 @@ function checkForUpdates(callback) {
 
 function installUpdates(callback) {
   let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/install.sh', 'install_updates'],
+            [Me.path + '/helpers.sh', 'install_updates'],
             null,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);

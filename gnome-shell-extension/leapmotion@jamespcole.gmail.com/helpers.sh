@@ -302,6 +302,43 @@ elif [ $1 = 'install_updates' ]; then
 	GIT_RESULT=$(git pull origin master)
 
 	exit 0
+elif [ $1 = 'start_service' ]; then
+
+	if [ ! -f "$install_dir/gestures.js" ]; then
+		exit 1
+	fi
+
+	process_count=$(ps ux -u $USER -U $USER | grep '[g]estures.js' | wc -l)	
+	if [ $process_count -eq 0 ]; then
+		cd "$install_dir"
+		node "$install_dir/gestures.js"  
+	fi
+
+	exit 0
+elif [ $1 = 'stop_service' ]; then
+
+	if [ ! -f "$install_dir/gestures.js" ]; then
+		exit 1
+	fi
+	
+	process_count=$(ps ux -u $USER -U $USER | grep '[g]estures.js' | wc -l)	
+	if [ $process_count -ne 0 ]; then		
+		kill $(ps ux -u $USER -U $USER | grep '[g]estures.js' | awk '{print $2}') > /dev/null 2>&1
+	fi
+
+	exit 0
+elif [ $1 = 'service_running' ]; then
+
+	if [ ! -f "$install_dir/gestures.js" ]; then
+		exit 1
+	fi
+	
+	process_count=$(ps ux -u $USER -U $USER | grep '[g]estures.js' | wc -l)	
+	if [ $process_count -ne 0 ]; then
+		exit 0
+	fi
+
+	exit 1
 else
 	print_success "Installing required components...\n\n"
 
