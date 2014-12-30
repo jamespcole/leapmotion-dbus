@@ -286,11 +286,22 @@ elif [ $1 = 'update_check' ]; then
 
 	cd "$install_dir"
 
-	git fetch
+	git fetch > /dev/null 2>&1
 
 	DIFF_COUNT=$(git rev-list HEAD...origin/master --count @)
 
 	exit $DIFF_COUNT
+elif [ $1 = 'install_updates' ]; then
+
+	if [ ! -d "$install_dir" ]; then
+		exit 1
+	fi
+
+	cd "$install_dir"
+
+	GIT_RESULT=$(git pull origin master)
+
+	exit 0
 else
 	print_success "Installing required components...\n\n"
 

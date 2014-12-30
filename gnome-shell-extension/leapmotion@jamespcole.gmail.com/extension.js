@@ -104,9 +104,16 @@ const LeapMotionMenu = new Lang.Class({
       
 
       this._updateServiceItem = new PopupMenu.PopupMenuItem(_("Install Updates"));
-      this._updateServiceItem.connect('activate', Lang.bind(this, function() {
-            //let dialog = new LeapMotionInstallDialog();
-            //dialog.open(global.get_current_time());
+      this._updateServiceItem.connect('activate', Lang.bind(this, function() {            
+            installUpdates(function(success) {
+              if(!success) {
+                _showText("Update installation failed!");
+              }
+              else {
+                _showText("Updated leapmotion service successfully.");
+                button._updateServiceItem.actor.hide();
+              }
+            });
         }));
       this.menu.addMenuItem(this._updateServiceItem);
 
@@ -780,5 +787,32 @@ function checkForUpdates(callback) {
             callback(false);
         else
             callback(true);
+    });
+}
+
+
+function installUpdates(callback) {
+  let [success, pid] = GLib.spawn_async(Me.path,
+            [Me.path + '/install.sh', 'install_updates'],
+            null,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+
+    if (!success) {
+        callback(false);
+        return;
+    }
+
+    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
+        GLib.spawn_close_pid(pid);
+        if (status != 0) {
+          callback(false);
+        }            
+        else {
+          checkForUpdates(function(upToDate) {            
+            callback(upToDate);
+          });          
+        }
+            
     });
 }
