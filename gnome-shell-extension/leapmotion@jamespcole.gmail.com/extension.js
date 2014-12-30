@@ -114,6 +114,9 @@ const LeapMotionMenu = new Lang.Class({
               else {
                 _showText("Updated leapmotion service successfully.");
                 button._updateServiceItem.actor.hide();
+                if(showAdvancedMenuItems) {
+                  button._forceUpdateServiceItem.actor.show();
+                }
               }
             });
         }));
