@@ -233,18 +233,27 @@ const LeapMotionMenu = new Lang.Class({
       }
       else {
         if(leapMotionManager.isLeapMotionConnected) {          
-        /*let icon = new St.Icon({ icon_name: 'system-run-symbolic',
-                                   style_class: 'system-status-icon' });*/
           let icon = new St.Icon({ icon_name: 'emblem-system-symbolic',
                                    style_class: 'system-status-icon' });
           this.StatusIcon = icon;
           this.actor.add_child(this.StatusIcon);
         }
         else {
-          let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
+
+          if(leapMotionManager.isServiceRunning) {
+            let icon = new St.Icon({ icon_name: 'system-run-symbolic',
                                    style_class: 'system-status-icon' });
-          this.StatusIcon = icon;
-          this.actor.add_child(this.StatusIcon);
+            this.StatusIcon = icon;
+            this.actor.add_child(this.StatusIcon);
+          }
+          else {
+            let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
+                                   style_class: 'system-status-icon' });
+            this.StatusIcon = icon;
+            this.actor.add_child(this.StatusIcon);
+
+            this._startServiceItem.actor.show();  
+          }          
         }
       }      
     }
