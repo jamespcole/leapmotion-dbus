@@ -206,7 +206,7 @@ const LeapMotionMenu = new Lang.Class({
           this._forceUpdateServiceItem.actor.show();  
         }        
         else {
-          this._forceUpdateServiceItem.actor.show();  
+          this._forceUpdateServiceItem.actor.hide();  
         }
         if(leapMotionManager.isServiceRunning) {
           this._stopServiceItem.actor.show(); 
@@ -260,7 +260,6 @@ const LeapMotionMenu = new Lang.Class({
     
 });
 
-let lm_connected = false;
 let mode = '';
 
 function enable() {
@@ -714,8 +713,6 @@ const LeapDBusEventSource = new Lang.Class({
     },
 
     _onLeapMotionControllerDisconnected: function(proxy, sender, data) {
-      lm_connected = false;
-      //button.setStatusIcon(lm_connected);
       leapMotionManager.isLeapMotionConnected = false;
       leapMotionManager.sendUpdates();
       Main.notify('LeapMotion', 'LeapMotion has been disconnected');
@@ -723,8 +720,6 @@ const LeapDBusEventSource = new Lang.Class({
     },
 
     _onLeapMotionControllerConnected: function(proxy, sender, data) {
-      lm_connected = true;
-      //button.setStatusIcon(lm_connected);
       leapMotionManager.isLeapMotionConnected = true;
       leapMotionManager.sendUpdates();
       Main.notify('LeapMotion', 'LeapMotion has been connected');
@@ -732,17 +727,15 @@ const LeapDBusEventSource = new Lang.Class({
 
     _onLeapMotionHeartbeat: function(proxy, sender, data) {
       let status = (data == 'false') ? false : true;      
-      if(status != lm_connected) {
-        lm_connected = status;
+      if(status != leapMotionManager.isLeapMotionConnected) {
+        leapMotionManager.isLeapMotionConnected = status;
         
-        if(lm_connected === true) {
+        if(leapMotionManager.isLeapMotionConnected === true) {
           Main.notify('LeapMotion', 'LeapMotion device connected');
         }
         else {
           Main.notify('LeapMotion', 'LeapMotion has been disconnected');
-        }
-        //button.setStatusIcon(lm_connected);
-        leapMotionManager.isLeapMotionConnected = lm_connected;
+        }        
         leapMotionManager.sendUpdates();
       }
     }
@@ -886,7 +879,7 @@ const LeapMotionManager = new Lang.Class({
     installUpdates: function(callback) {
       this.isInstallingUpdates = true;
       this.sendUpdates();
-      this.runHelper('update_check', Lang.bind(this, function(success) {
+      this.runHelper('install_updates', Lang.bind(this, function(success) {
           if (!success) {
             if(callback) {
               callback(false);
