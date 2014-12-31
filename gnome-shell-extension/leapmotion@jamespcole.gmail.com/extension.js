@@ -96,10 +96,7 @@ const LeapMotionMenu = new Lang.Class({
             enablePointing = !enablePointing;
             if(enablePointing) {
               _showText("Pointing enabled, use a single finger to move the cursor.");
-            }
-            else {
-              _showText("Pointing disabled.");
-            }
+            }            
         }));
       this.menu.addMenuItem(enablePointerItem);
 
@@ -146,10 +143,7 @@ const LeapMotionMenu = new Lang.Class({
             leapMotionManager.startService(function(success) {
               if(!success) {
                 _showText("Could not start service!");
-              }
-              else {
-                _showText("Started service successfully.");                
-              }
+              }              
             });
         }));
       this.menu.addMenuItem(this._startServiceItem);
@@ -159,10 +153,7 @@ const LeapMotionMenu = new Lang.Class({
             leapMotionManager.stopService(function(success) {
               if(!success) {
                 _showText("Could not stop service!");
-              }
-              else {
-                _showText("Stopped service successfully.");    
-              }
+              }              
             });
         }));
       this.menu.addMenuItem(this._stopServiceItem);      
@@ -477,6 +468,8 @@ const LeapDBusEventSource = new Lang.Class({
     },
 
   _onLeapMotionKeyTap: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('keytap', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -490,6 +483,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionSwipeLeft: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('swipe left', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -514,6 +509,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionSwipeRight: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('swipe right', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -532,6 +529,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionSwipeUp: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('swipe up', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -556,6 +555,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionSwipeDown: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('swipe down', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -579,6 +580,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionClockWise: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('Clockwise', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -616,6 +619,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionAntiClockWise: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
     debugLog('Anti Clockwise', data);
     let str_result = String(data);
     let bits = str_result.split(',');
@@ -654,6 +659,8 @@ const LeapDBusEventSource = new Lang.Class({
   },
 
   _onLeapMotionFingersChanged: function(proxy, sender, data) {
+    leapMotionManager.setProp('isLeapMotionConnected', true);   
+
       debugLog('Fingers Changed');
       //should not need to do this, it should already be an array
       let str_result = String(data);
@@ -694,6 +701,7 @@ const LeapDBusEventSource = new Lang.Class({
     },
 
     _onLeapMotionPointerMove: function(proxy, sender, data) {
+      leapMotionManager.setProp('isLeapMotionConnected', true);   
 
       let str_result = String(data);
       let bits = str_result.split(',');
@@ -713,30 +721,27 @@ const LeapDBusEventSource = new Lang.Class({
     },
 
     _onLeapMotionControllerDisconnected: function(proxy, sender, data) {
-      leapMotionManager.isLeapMotionConnected = false;
-      leapMotionManager.sendUpdates();
+      leapMotionManager.setProp('isLeapMotionConnected', false);
       Main.notify('LeapMotion', 'LeapMotion has been disconnected');
 
     },
 
     _onLeapMotionControllerConnected: function(proxy, sender, data) {
-      leapMotionManager.isLeapMotionConnected = true;
-      leapMotionManager.sendUpdates();
+      leapMotionManager.setProp('isLeapMotionConnected', true);      
       Main.notify('LeapMotion', 'LeapMotion has been connected');
     },
 
     _onLeapMotionHeartbeat: function(proxy, sender, data) {
       let status = (data == 'false') ? false : true;      
-      if(status != leapMotionManager.isLeapMotionConnected) {
-        leapMotionManager.isLeapMotionConnected = status;
+      if(status != leapMotionManager.isLeapMotionConnected) {        
+        leapMotionManager.setProp('isLeapMotionConnected', status);      
         
         if(leapMotionManager.isLeapMotionConnected === true) {
           Main.notify('LeapMotion', 'LeapMotion device connected');
         }
         else {
           Main.notify('LeapMotion', 'LeapMotion has been disconnected');
-        }        
-        leapMotionManager.sendUpdates();
+        }                
       }
     }
   
@@ -830,13 +835,34 @@ const LeapMotionManager = new Lang.Class({
     isServiceRunning: false,
     isLeapMotionConnected: false,
     isInstallingUpdates: false,
+    isFatalError: false,
 
     updateListeners: [],
 
     _init: function() {
       this.parent();
-      this.runAllChecks();
-      this.startTimer();
+      //we need to make sure the helper script is executable first
+      let [success, pid] = GLib.spawn_async(Me.path,
+            ['chmod', 'a+x', Me.path + '/helpers.sh'],
+            null,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+
+      if (!success) {  
+        this.setProp('isFatalError', true);
+        return;
+      }
+
+      GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, Lang.bind(this, function(pid, status) {
+          GLib.spawn_close_pid(pid);
+          if (status != 0) {
+            this.setProp('isFatalError', true);            
+          }            
+          else {                   
+            this.runAllChecks();
+            this.startTimer();        
+          }              
+      }));            
     },
 
     runAllChecks: function() {
@@ -974,6 +1000,13 @@ const LeapMotionManager = new Lang.Class({
     sendUpdates: function() {
       for(let i = 0; i < this.updateListeners.length; i++) {
         this.updateListeners[i](this);
+      }
+    },
+
+    setProp: function(name, value) {
+      if(this[name] !== value) {
+        this[name] = value;
+        this.sendUpdates();        
       }
     },
 
