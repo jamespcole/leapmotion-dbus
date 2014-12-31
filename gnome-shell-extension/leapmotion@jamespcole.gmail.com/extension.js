@@ -179,7 +179,7 @@ const LeapMotionMenu = new Lang.Class({
         this._forceUpdateServiceItem.actor.hide();
       }
 
-      if(leapMotionManager.isInstallReguired) {
+      if(leapMotionManager.isInstallRequired) {
         this._installServiceItem.actor.show();
       }
       else {
@@ -218,6 +218,12 @@ const LeapMotionMenu = new Lang.Class({
 
       if(leapMotionManager.isInstallingUpdates) {        
         let icon = new St.Icon({ icon_name: 'document-save-symbolic',
+                                   style_class: 'system-status-icon' });
+        this.StatusIcon = icon;
+        this.actor.add_child(this.StatusIcon);
+      }
+      else if(leapMotionManager.isInstallRunning) {        
+        let icon = new St.Icon({ icon_name: 'emblem-synchronizing-symbolic',
                                    style_class: 'system-status-icon' });
         this.StatusIcon = icon;
         this.actor.add_child(this.StatusIcon);
@@ -816,8 +822,13 @@ const LeapMotionInstallDialog = new Lang.Class({
 
     _onOk: function() {
         
-        Util.spawn(['chmod', '+x', Me.path + '/helpers.sh']);
-        Util.spawn(['gnome-terminal', '-e', Me.path + '/helpers.sh']);
+        //Util.spawn(['chmod', '+x', Me.path + '/helpers.sh']);
+        //Util.spawn(['gnome-terminal', '-e', Me.path + '/helpers.sh']);
+        leapMotionManager.installService(function(success) {
+          if(!success) {
+            _showText("Failed to install required components");   
+          }          
+        });
         this.close(global.get_current_time());
           
           
@@ -836,6 +847,7 @@ const LeapMotionManager = new Lang.Class({
     isLeapMotionConnected: false,
     isInstallingUpdates: false,
     isFatalError: false,
+    isInstallRunning: false,
 
     updateListeners: [],
 
@@ -979,9 +991,9 @@ const LeapMotionManager = new Lang.Class({
 
     startTimer: function() {
       this._timerId = Mainloop.timeout_add_seconds(120, Lang.bind(this,
-            function() {
-                this.checkLeapService();
-                return true;                
+            function() {              
+              this.checkLeapService();                              
+              return true;                
             }));
     },
 
@@ -995,6 +1007,67 @@ const LeapMotionManager = new Lang.Class({
           this.sendUpdates();
         }        
       }));
+    },
+
+    installService: function(callback) {
+      this.setProp('isInstallRunning', true);
+      let [success, pid] = GLib.spawn_async(Me.path,
+            ['gnome-terminal', '-e', Me.path + '/helpers.sh install_reqs'],
+            null,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+
+      if (!success) {
+          if(callback)  {
+            callback(false);
+          }          
+          return;
+      }
+
+      GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, Lang.bind(this, function(pid, status) {
+          GLib.spawn_close_pid(pid);   
+          this.installTimer();                              
+      }));
+
+      
+    },
+
+    checkInstallRunning: function(callback) {
+      this.runHelper('install_running', Lang.bind(this, function(running) {
+        if(callback) {
+          callback(running);
+        }
+        if(this.isInstallRunning == true && running == false) {
+            this.setProp('isInstallRunning', running);
+            this.checkPrerequisites(Lang.bind(this, function(installRequired) {  
+              if(!installRequired) {
+                this.startService();
+              }            
+            }));
+        }
+        else {
+          this.setProp('isInstallRunning', running);   
+        }                
+        if(!running) {
+          if(this._installTimerId > 0) {
+            Mainloop.source_remove(this._installTimerId);
+            this._installTimerId = 0;        
+          }  
+        }
+      }));
+    },
+
+    installTimer: function() {
+      this._installTimerId = Mainloop.timeout_add_seconds(5, Lang.bind(this,
+            function() {                 
+              if(this.isInstallRunning) {
+                this.checkInstallRunning();                              
+                return true; 
+              }
+              else {
+                return false; 
+              }                                        
+            }));
     },
 
     sendUpdates: function() {
@@ -1019,6 +1092,11 @@ const LeapMotionManager = new Lang.Class({
         if(this._startingTimerId > 0) {
           Mainloop.source_remove(this._startingTimerId);
           this._startingTimerId = 0;        
+        }  
+
+        if(this._installTimerId > 0) {
+          Mainloop.source_remove(this._installTimerId);
+          this._installTimerId = 0;        
         }  
 
         this.parent();

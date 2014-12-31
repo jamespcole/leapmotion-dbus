@@ -339,7 +339,7 @@ elif [ $1 = 'service_running' ]; then
 	fi
 
 	exit 1
-else
+elif [ $1 = 'install_reqs' ]; then
 	print_success "Installing required components...\n\n"
 
 	require_command "add-apt-repository" "python-software-properties" result
@@ -360,19 +360,26 @@ else
 
 	#sudo /etc/init.d/leapmotion-dbus restart
 
-	install_leapmotion_dbus
-
-	print_info "Making start script executable and starting leapmotion-dbus..."
-
-	chmod +x "$( dirname "$0" )"/start_leapmotion-dbus.sh
-
-	"$( dirname "$0" )"/start_leapmotion-dbus.sh &
-
-	sleep 5
+	install_leapmotion_dbus	
 
 	print_success "\n\nInstallation complete."
 
 	print_text "Hit ENTER to continue..."
 
 	read
+
+	exit 0
+elif [ $1 = 'installation_pids' ]; then
+	install_pids=$(ps aux | grep 'jamespcole.gmail.com/[h]elpers.sh install_reqs' | sed -n 1p | awk '{printf $2}')
+	echo $install_pids
+	exit $install_pids
+elif [ $1 = 'install_running' ]; then
+	process_count=$(ps ux -u $USER -U $USER | grep '[h]elpers.sh install_reqs' | wc -l)	
+	if [ $process_count -ne 0 ]; then
+		exit 0
+	fi
+
+	exit 1
+else
+	exit 1
 fi
