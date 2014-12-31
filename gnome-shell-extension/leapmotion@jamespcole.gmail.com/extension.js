@@ -21,9 +21,10 @@ const ModalDialog = imports.ui.modalDialog;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 
-let text, button, winInjections, workspaceInjections, workViewInjections, createdActors, connectedSignals;
-let logToConsole, logToUI, enablePointing, numberOfPointingFingers, showAdvancedMenuItems;
-let leapmotionProcess;
+let text, button, winInjections, workspaceInjections, workViewInjections, createdActors, connectedSignals; //actors
+let logToConsole, logToUI, enablePointing, numberOfPointingFingers, showAdvancedMenuItems; //settings
+let isUpToDate, isInstallReguired, isServiceRunning, isLeapMotionConnected; //state info
+let leapMotionManager;
 
 function resetState() {
     winInjections = { };
@@ -36,6 +37,17 @@ function resetState() {
     enablePointing = false;
     numberOfPointingFingers = 1;
     showAdvancedMenuItems = true;
+
+    //set the states to default values
+    isUpToDate = false;
+    isInstallReguired = false;
+    isServiceRunning = false;
+    isLeapMotionConnected = false;
+
+    if(leapMotionManager) {
+      leapMotionManager.destroy();
+    }
+    leapMotionManager = new LeapMotionManager();
 };
 
 function _hideText() {
@@ -76,15 +88,7 @@ const LeapMotionMenu = new Lang.Class({
     _init: function() {
       this.parent(0.0, _("LeapMotion"));
 
-      this._screenSignals = [];
-      
-      let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
-                               style_class: 'system-status-icon' });
-
-      this._connected = false;
-
-      this.actor.add_child(icon);
-      this.StatusIcon = icon;
+      this._screenSignals = [];      
 
       let enablePointerItem = new PopupMenu.PopupSwitchMenuItem(_('Pointer'), enablePointing);
   
@@ -109,46 +113,37 @@ const LeapMotionMenu = new Lang.Class({
 
       this._updateServiceItem = new PopupMenu.PopupMenuItem(_("Install Updates"));
       this._updateServiceItem.connect('activate', Lang.bind(this, function() {            
-            installUpdates(function(success) {
-              if(!success) {
-                _showText("Update installation failed!");
-              }
-              else {
-                _showText("Updated leapmotion service successfully.");
-                button._updateServiceItem.actor.hide();
-                if(showAdvancedMenuItems) {
-                  button._forceUpdateServiceItem.actor.show();
-                }
-              }
-            });
-        }));
-      this.menu.addMenuItem(this._updateServiceItem);
-
-      this._updateServiceItem.actor.hide();
-
-      this.checkForPrerequisites(true);
-
-      this._advancedOptionsSeparator = new PopupMenu.PopupSeparatorMenuItem();
-      this.menu.addMenuItem(this._advancedOptionsSeparator);
-
-      this._forceUpdateServiceItem = new PopupMenu.PopupMenuItem(_("Force Installing Updates"));
-      this._forceUpdateServiceItem.connect('activate', Lang.bind(this, function() {     
-            button.toggleIconTemporarily('document-save-symbolic', true);
-            installUpdates(function(success) {
+            leapMotionManager.installUpdates(function(success) {
               if(!success) {
                 _showText("Update installation failed!");
               }
               else {
                 _showText("Updated leapmotion service successfully.");                
               }
-              button.toggleIconTemporarily('document-save-symbolic', false);
+            });
+        }));
+      this.menu.addMenuItem(this._updateServiceItem);
+
+
+      this._advancedOptionsSeparator = new PopupMenu.PopupSeparatorMenuItem();
+      this.menu.addMenuItem(this._advancedOptionsSeparator);
+
+      this._forceUpdateServiceItem = new PopupMenu.PopupMenuItem(_("Force Installing Updates"));
+      this._forceUpdateServiceItem.connect('activate', Lang.bind(this, function() {                
+            leapMotionManager.installUpdates(function(success) {
+              if(!success) {
+                _showText("Update installation failed!");
+              }
+              else {
+                _showText("Updated leapmotion service successfully.");                
+              }              
             });
         }));
       this.menu.addMenuItem(this._forceUpdateServiceItem);
 
       this._startServiceItem = new PopupMenu.PopupMenuItem(_("Start Service"));
       this._startServiceItem.connect('activate', Lang.bind(this, function() {            
-            runHelper('start_service', function(success) {
+            leapMotionManager.startService(function(success) {
               if(!success) {
                 _showText("Could not start service!");
               }
@@ -161,45 +156,84 @@ const LeapMotionMenu = new Lang.Class({
 
       this._stopServiceItem = new PopupMenu.PopupMenuItem(_("Stop Service"));
       this._stopServiceItem.connect('activate', Lang.bind(this, function() {            
-            runHelper('stop_service', function(success) {
+            leapMotionManager.stopService(function(success) {
               if(!success) {
                 _showText("Could not stop service!");
               }
               else {
                 _showText("Stopped service successfully.");    
-                button.checkLeapConnection();
               }
             });
         }));
       this.menu.addMenuItem(this._stopServiceItem);      
 
+      leapMotionManager.updateListeners.push(Lang.bind(this, function(manager) {
+        this.render();
+      }));
+
+      this.actor.show();
+      this.render();
+    },
+
+    destroy: function() {
+        this.parent();
+    },
+
+    render: function() {
+      if(leapMotionManager.isUpToDate) {
+        this._updateServiceItem.actor.hide();        
+      }
+      else {
+        this._updateServiceItem.actor.show();
+        this._forceUpdateServiceItem.actor.hide();
+      }
+
+      if(leapMotionManager.isInstallReguired) {
+        this._installServiceItem.actor.show();
+      }
+      else {
+        this._installServiceItem.actor.hide();
+      }
+
       if(!showAdvancedMenuItems) {
         this._forceUpdateServiceItem.actor.hide();
         this._startServiceItem.actor.hide();
         this._stopServiceItem.actor.hide();
-        this._advancedOptionsSeparator.hide();
-      }      
-
-      this.startTimer();
-      /*this.menu.addMenuItem(new PopupMenu.PopupMenuItem(_("Settings")));*/
-
-      this.actor.show();
-    },
-
-    destroy: function() {
-        if (this._timerId > 0) {
-            Mainloop.source_remove(this._timerId);
-            this._timerId = 0;
+        this._advancedOptionsSeparator.actor.hide();
+      }
+      else {
+        if(leapMotionManager.isUpToDate) { //if not up to date the other menu item will show anyway
+          this._forceUpdateServiceItem.actor.show();  
+        }        
+        else {
+          this._forceUpdateServiceItem.actor.show();  
         }
-        this.parent();
-    },
+        if(leapMotionManager.isServiceRunning) {
+          this._stopServiceItem.actor.show(); 
+          this._startServiceItem.actor.hide();   
+        }
+        else {
+          this._startServiceItem.actor.show();  
+          this._stopServiceItem.actor.hide();  
+        }
+        
+        
+        this._advancedOptionsSeparator.actor.show();
+      }
 
-    setStatusIcon: function(connected) {
-      if(this._connected != connected) {
-        this._connected = connected;
+      if(this.StatusIcon) {
         this.actor.remove_child(this.StatusIcon);
-        if(connected) {
-          /*let icon = new St.Icon({ icon_name: 'system-run-symbolic',
+      }
+
+      if(leapMotionManager.isInstallingUpdates) {        
+        let icon = new St.Icon({ icon_name: 'document-save-symbolic',
+                                   style_class: 'system-status-icon' });
+        this.StatusIcon = icon;
+        this.actor.add_child(this.StatusIcon);
+      }
+      else {
+        if(leapMotionManager.isLeapMotionConnected) {          
+        /*let icon = new St.Icon({ icon_name: 'system-run-symbolic',
                                    style_class: 'system-status-icon' });*/
           let icon = new St.Icon({ icon_name: 'emblem-system-symbolic',
                                    style_class: 'system-status-icon' });
@@ -213,79 +247,12 @@ const LeapMotionMenu = new Lang.Class({
           this.actor.add_child(this.StatusIcon);
         }
       }      
-    },
-
-    toggleIconTemporarily: function(name, toggleOn) {
-      if(toggleOn) {
-        this.actor.remove_child(this.StatusIcon);
-        this._previousIcon = this.StatusIcon;
-
-        this._temporaryIcon = new St.Icon({ icon_name: name, style_class: 'system-status-icon' });
-        this.StatusIcon = this._temporaryIcon;
-        this.actor.add_child(this.StatusIcon);
-      }
-      else {
-        this.actor.remove_child(this._temporaryIcon);
-        this.StatusIcon = this._previousIcon;
-        this.actor.add_child(this.StatusIcon);
-      }
-    },
-
-    checkForPrerequisites: function(checkUpdates) {
-      //check to see if everything we need is installed
-      checkPrerequisites(function(hasPrerequisites) {    
-          button._hasPrerequisites = hasPrerequisites;       
-          if(!hasPrerequisites) {            
-            button._installServiceItem.actor.show();
-          }
-          else {
-            button._installServiceItem.actor.hide();
-            if(checkUpdates) {
-              button.checkUpdates();
-            }
-          }
-        });
-    },
-
-    checkUpdates: function() {
-      checkForUpdates(function(upToDate) {  
-          button._upToDate = upToDate; 
-          if(!button._hasPrerequisites) {
-            button._updateServiceItem.actor.hide();
-            return;
-          }
-
-          if(!upToDate) {            
-            button._updateServiceItem.actor.show();
-            button._forceUpdateServiceItem.actor.hide();
-          }
-          else {
-            button._updateServiceItem.actor.hide();
-            if(showAdvancedMenuItems) {
-              button._forceUpdateServiceItem.actor.show();
-            }
-          }
-        });
-    },
-
-    startTimer: function() {
-      this._timerId = Mainloop.timeout_add_seconds(120, Lang.bind(this,
-            function() {
-                this.checkLeapConnection();
-                return true;                
-            }));
-    },
-
-    checkLeapConnection: function() {
-      runHelper('service_running', function(running) {
-        button.setStatusIcon(running);
-      });
     }
     
 });
 
-var lm_connected = false;
-var mode = '';
+let lm_connected = false;
+let mode = '';
 
 function enable() {
   resetState();
@@ -309,7 +276,6 @@ function enable() {
     }));
 
     connectedSignals.push({ obj: Main.overview, id: hideSignalId });
-    //leapmotionProcess = Util.spawn([Me.path + '/start_leapmotion-dbus.sh']);
 }
 
 function removeInjection(object, injection, name) {
@@ -338,6 +304,8 @@ function disable() {
         i.destroy();
 
     button.destroy();
+
+    leapMotionManager.destroy();
 
     resetState();
 }
@@ -461,11 +429,11 @@ function toggleAltTab(show) {
 //these are for selecting windows from the overview
 //a bit of a hack but it's actually harder to do than
 //you would think
-var currentWorkspaceIndex = 0;
-var currentWindowIndex = 0;
+let currentWorkspaceIndex = 0;
+let currentWindowIndex = 0;
 //this is just to keep track of whether windows in the overview pane were selected using our custom
 //leapmotion method.
-var leapMotionOverviewSelectionUsed = false; 
+let leapMotionOverviewSelectionUsed = false; 
 
 const LeapDBusEventSource = new Lang.Class({
     Name: 'LeapDBusEventSource',
@@ -502,9 +470,9 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionKeyTap: function(proxy, sender, data) {
     debugLog('keytap', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var fingers = bits[0];
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let fingers = bits[0];
     debugLog('KeyTap fingers == ' + fingers, null, true);
 
     if(enablePointing && fingers == numberOfPointingFingers) {
@@ -515,10 +483,10 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionSwipeLeft: function(proxy, sender, data) {
     debugLog('swipe left', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var distance = bits[0];
-    var fingers = bits[1];
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let distance = bits[0];
+    let fingers = bits[1];
     debugLog('Swipe Left fingers == ' + fingers, null, true);
 
     if(enablePointing && fingers == numberOfPointingFingers) {
@@ -539,10 +507,10 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionSwipeRight: function(proxy, sender, data) {
     debugLog('swipe right', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var distance = bits[0];
-    var fingers = bits[1];
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let distance = bits[0];
+    let fingers = bits[1];
     debugLog('Swipe Right fingers == ' + fingers, null, true);
 
     if(enablePointing && fingers == numberOfPointingFingers) {
@@ -557,10 +525,10 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionSwipeUp: function(proxy, sender, data) {
     debugLog('swipe up', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var distance = bits[0];
-    var fingers = bits[1];
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let distance = bits[0];
+    let fingers = bits[1];
     debugLog('Swipe Up fingers == ' + fingers, null, true);
 
     if(enablePointing && fingers == numberOfPointingFingers) {
@@ -571,9 +539,9 @@ const LeapDBusEventSource = new Lang.Class({
       Util.spawn(['xdotool', 'click', '4']);
     }
     else {
-      var scaled_val = Math.abs(distance / 15);
+      let scaled_val = Math.abs(distance / 15);
       debugLog('scaled value', scaled_val);
-      for(var i = 0; i < scaled_val; i++) {
+      for(let i = 0; i < scaled_val; i++) {
         Util.spawn(['xdotool', 'click', '4']);
       }
     }
@@ -581,10 +549,10 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionSwipeDown: function(proxy, sender, data) {
     debugLog('swipe down', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var distance = bits[0];
-    var fingers = bits[1];    
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let distance = bits[0];
+    let fingers = bits[1];    
     debugLog('Swipe Down fingers == ' + fingers, null, true);
     if(enablePointing && fingers == numberOfPointingFingers) {
       debugLog('cancelled because pointing is enabled', data);
@@ -594,9 +562,9 @@ const LeapDBusEventSource = new Lang.Class({
       Util.spawn(['xdotool', 'click', '5']);
     }
     else {
-      var scaled_val = Math.abs(distance / 15);
+      let scaled_val = Math.abs(distance / 15);
       debugLog('scaled value', scaled_val);
-      for(var i = 0; i < scaled_val; i++) {
+      for(let i = 0; i < scaled_val; i++) {
         Util.spawn(['xdotool', 'click', '5']);
       }
     }
@@ -604,10 +572,10 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionClockWise: function(proxy, sender, data) {
     debugLog('Clockwise', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var distance = bits[0];
-    var fingers = bits[1];    
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let distance = bits[0];
+    let fingers = bits[1];    
     debugLog('Clockwise fingers == ' + fingers + ' distance == ' + distance, null, true);
     if(enablePointing && fingers == numberOfPointingFingers) {
       debugLog('cancelled because pointing is enabled', data);
@@ -620,7 +588,7 @@ const LeapDBusEventSource = new Lang.Class({
       }*/
 
       //This is so that windows can be selected in the main window
-      var selectedWorkspace = global.screen.get_active_workspace_index();
+      let selectedWorkspace = global.screen.get_active_workspace_index();
       if(selectedWorkspace != currentWorkspaceIndex) {
         currentWindowIndex = 0;
         leapMotionOverviewSelectionUsed = false;
@@ -641,10 +609,10 @@ const LeapDBusEventSource = new Lang.Class({
 
   _onLeapMotionAntiClockWise: function(proxy, sender, data) {
     debugLog('Anti Clockwise', data);
-    var str_result = String(data);
-    var bits = str_result.split(',');
-    var distance = bits[0];
-    var fingers = bits[1];
+    let str_result = String(data);
+    let bits = str_result.split(',');
+    let distance = bits[0];
+    let fingers = bits[1];
     debugLog('Anti Clockwise fingers == ' + fingers + ' distance == ' + distance, null, true);
     if(enablePointing && fingers == numberOfPointingFingers) {
       debugLog('cancelled because pointing is enabled', data);
@@ -653,7 +621,7 @@ const LeapDBusEventSource = new Lang.Class({
 
     if(mode == 'overview') {
       //This is so that windows can be selected in the main window
-      var selectedWorkspace = global.screen.get_active_workspace_index();
+      let selectedWorkspace = global.screen.get_active_workspace_index();
       if(selectedWorkspace != currentWorkspaceIndex) {
         currentWindowIndex = 0;
         leapMotionOverviewSelectionUsed = false;
@@ -680,12 +648,12 @@ const LeapDBusEventSource = new Lang.Class({
   _onLeapMotionFingersChanged: function(proxy, sender, data) {
       debugLog('Fingers Changed');
       //should not need to do this, it should already be an array
-      var str_result = String(data);
+      let str_result = String(data);
       debugLog(str_result.split(','));
 
-      var bits = str_result.split(',');
-      var from = bits[0];
-      var to = bits[1];
+      let bits = str_result.split(',');
+      let from = bits[0];
+      let to = bits[1];
       debugLog('from ' + from, 'to ' + to);
       debugLog('from ' + from + ' to ' + to, null, true);
       debugLog('in mode ' + mode);
@@ -719,18 +687,18 @@ const LeapDBusEventSource = new Lang.Class({
 
     _onLeapMotionPointerMove: function(proxy, sender, data) {
 
-      var str_result = String(data);
-      var bits = str_result.split(',');
-      var x = bits[0];
-      var y = bits[1];
-      var fingers = bits[2];
+      let str_result = String(data);
+      let bits = str_result.split(',');
+      let x = bits[0];
+      let y = bits[1];
+      let fingers = bits[2];
 
       if(enablePointing && fingers == numberOfPointingFingers) {
 
         let monitor = Main.layoutManager.primaryMonitor;
 
-        var monitor_height = monitor.height;
-        var monitor_width = monitor.width;
+        let monitor_height = monitor.height;
+        let monitor_width = monitor.width;
         
         Util.spawn(['xdotool', 'mousemove', '--', String(Math.round(x * monitor_width)), String(Math.round(monitor_height - y * monitor_height))]);        
       }
@@ -738,19 +706,23 @@ const LeapDBusEventSource = new Lang.Class({
 
     _onLeapMotionControllerDisconnected: function(proxy, sender, data) {
       lm_connected = false;
-      button.setStatusIcon(lm_connected);
+      //button.setStatusIcon(lm_connected);
+      leapMotionManager.isLeapMotionConnected = false;
+      leapMotionManager.sendUpdates();
       Main.notify('LeapMotion', 'LeapMotion has been disconnected');
 
     },
 
     _onLeapMotionControllerConnected: function(proxy, sender, data) {
       lm_connected = true;
-      button.setStatusIcon(lm_connected);
+      //button.setStatusIcon(lm_connected);
+      leapMotionManager.isLeapMotionConnected = true;
+      leapMotionManager.sendUpdates();
       Main.notify('LeapMotion', 'LeapMotion has been connected');
     },
 
     _onLeapMotionHeartbeat: function(proxy, sender, data) {
-      var status = (data == 'false') ? false : true;      
+      let status = (data == 'false') ? false : true;      
       if(status != lm_connected) {
         lm_connected = status;
         
@@ -760,7 +732,9 @@ const LeapDBusEventSource = new Lang.Class({
         else {
           Main.notify('LeapMotion', 'LeapMotion has been disconnected');
         }
-        button.setStatusIcon(lm_connected);
+        //button.setStatusIcon(lm_connected);
+        leapMotionManager.isLeapMotionConnected = lm_connected;
+        leapMotionManager.sendUpdates();
       }
     }
   
@@ -847,97 +821,172 @@ const LeapMotionInstallDialog = new Lang.Class({
     }
 });
 
+const LeapMotionManager = new Lang.Class({
+    Name: 'LeapMotionManager',
+    isInstallRequired: false,
+    isUpToDate: false,
+    isServiceRunning: false,
+    isLeapMotionConnected: false,
+    isInstallingUpdates: false,
 
-function checkPrerequisites(callback) {
-  let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/helpers.sh', 'prereqs_check'],
-            null,
-            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-            null);
+    updateListeners: [],
 
-    if (!success) {
-        callback(false);
-        return;
-    }
+    _init: function() {
+      this.parent();
+      this.runAllChecks();
+      this.startTimer();
+    },
 
-    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
-        GLib.spawn_close_pid(pid);
-        if (status != 0)
-            callback(false);
-        else
-            callback(true);
-    });
-}
+    runAllChecks: function() {
+      this.checkPrerequisites();
+      this.checkForUpdates();
+      this.checkLeapService();
+    },
 
-function checkForUpdates(callback) {
-  let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/helpers.sh', 'update_check'],
-            null,
-            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-            null);
+    checkPrerequisites: function(callback) {
+      this.runHelper('prereqs_check', Lang.bind(this, function(success) {
+          if(!success) {
+            this.isInstallRequired = true;
+          }
+          else {
+            this.isInstallRequired = false;            
+          }
+          if(callback) {
+            callback(this.isInstallRequired);    
+          }
+          
+          this.sendUpdates();        
+      }));      
+    },
 
-    if (!success) {
-        callback(false);
-        return;
-    }
+    checkForUpdates: function(callback) {
+      this.runHelper('update_check', Lang.bind(this, function(success) {
+          if(!success) {
+            this.isUpToDate = false;
+          }
+          else {
+            this.isUpToDate = true;            
+          }
+          if(callback) {
+            callback(this.isUpToDate); 
+          }
+          this.sendUpdates();         
+      }));
+    },
 
-    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
-        GLib.spawn_close_pid(pid);
-        if (status != 0)
-            callback(false);
-        else
-            callback(true);
-    });
-}
+    installUpdates: function(callback) {
+      this.isInstallingUpdates = true;
+      this.sendUpdates();
+      this.runHelper('update_check', Lang.bind(this, function(success) {
+          if (!success) {
+            if(callback) {
+              callback(false);
+            }
+          }            
+          else {
+            this.checkForUpdates(function(upToDate) {              
+              if(callback) {        
+                callback(upToDate);                
+              }
+            }); 
+          }
+          this.isInstallingUpdates = false;
+          this.sendUpdates();
+      }));
+    },
 
-
-function installUpdates(callback) {
-  let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/helpers.sh', 'install_updates'],
-            null,
-            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-            null);
-
-    if (!success) {
-        callback(false);
-        return;
-    }
-
-    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
-        GLib.spawn_close_pid(pid);
-        if (status != 0) {
-          callback(false);
-        }            
-        else {
-          checkForUpdates(function(upToDate) {            
-            callback(upToDate);
-          });          
-        }
-            
-    });
-}
-
-
-function runHelper(name, callback) {
-  let [success, pid] = GLib.spawn_async(Me.path,
+    runHelper: function(name, callback) {
+      let [success, pid] = GLib.spawn_async(Me.path,
             [Me.path + '/helpers.sh', name],
             null,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);
 
-    if (!success) {
-        callback(false);
-        return;
+      if (!success) {
+          callback(false);
+          return;
+      }
+
+      GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
+          GLib.spawn_close_pid(pid);
+          if (status != 0) {
+            callback(false);
+          }            
+          else {                   
+            callback(true);          
+          }
+              
+      });
+    },
+
+    stopService: function(callback) {
+      this.runHelper('stop_service', Lang.bind(this, function(success) {          
+          if(!success) {
+            
+          }
+          else {
+            this.isLeapMotionConnected = false;
+            this.isServiceRunning = false;
+          }
+          callback(success);
+          this.sendUpdates();
+        }));
+    },
+
+    startService: function(callback) {
+      Util.spawn([Me.path + '/helpers.sh', 'start_service']);
+      //this is a long running process so we can't wait 
+      //but it takes a few seconds to start first
+      if(this._startingTimerId > 0) {
+        Mainloop.source_remove(this._startingTimerId);
+        this._startingTimerId = 0;        
+      }      
+
+      this._startingTimerId = Mainloop.timeout_add_seconds(5, Lang.bind(this,
+            function() {
+                this.checkLeapService(callback);
+                return false;                
+            }));
+    },
+
+    startTimer: function() {
+      this._timerId = Mainloop.timeout_add_seconds(120, Lang.bind(this,
+            function() {
+                this.checkLeapService();
+                return true;                
+            }));
+    },
+
+    checkLeapService: function(callback) {
+      this.runHelper('service_running', Lang.bind(this, function(running) {
+        if(callback) {
+          callback(running);
+        }
+        if(running != this.isServiceRunning) {
+          this.isServiceRunning = running;
+          this.sendUpdates();
+        }        
+      }));
+    },
+
+    sendUpdates: function() {
+      for(let i = 0; i < this.updateListeners.length; i++) {
+        this.updateListeners[i](this);
+      }
+    },
+
+    destroy: function() {
+        if (this._timerId > 0) {
+            Mainloop.source_remove(this._timerId);
+            this._timerId = 0;
+        }
+
+        if(this._startingTimerId > 0) {
+          Mainloop.source_remove(this._startingTimerId);
+          this._startingTimerId = 0;        
+        }  
+
+        this.parent();
     }
 
-    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, function(pid, status) {
-        GLib.spawn_close_pid(pid);
-        if (status != 0) {
-          callback(false);
-        }            
-        else {                   
-          callback(true);          
-        }
-            
-    });
-}
+});
