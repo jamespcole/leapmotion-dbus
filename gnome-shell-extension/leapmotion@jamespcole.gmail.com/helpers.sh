@@ -246,39 +246,72 @@ function print_text {
 	echo $1	
 }
 
+LOGFILE="$install_dir/logs/helpers.sh.log"
+RETAIN_NUM_LINES=1000
+
+function logsetup {
+	mkdir -p "$install_dir/logs"
+    TMP=$(tail -n $RETAIN_NUM_LINES $LOGFILE 2>/dev/null) && echo "${TMP}" > $LOGFILE
+    exec 2> >(logStdErr)
+}
+logStdErr() { while IFS='' read -r line; do echo "[$(date)]:	 $line"  >> "$LOGFILE"; done; };
+
+# function log {
+#     echo "[$(date)]: $*"
+# }
+
+function log {
+ echo "[$(date)]:	 $*">>"$LOGFILE"
+}
+
+function message {
+ echo "$1"
+ echo "[$(date)]: $*">>"$LOGFILE"
+}
+
+logsetup
+
 if [ $1 = 'prereqs_check' ]; then
+	log 'Checking for prerequisites'
 
 	checkCommandExists "node" result
 	if [ $result = 'false' ]; then
+		log 'Node is not installed'
 		exit 1
 	fi
 
 	checkCommandExists "leapd" result
 	if [ $result = 'false' ]; then
+		log 'leapd is not installed'
 		exit 1
 	fi
 
 	checkCommandExists "git" result
 	if [ $result = 'false' ]; then
+		log 'git is not installed'
 		exit 1
 	fi
 
 	checkCommandExists "xdotool" result
 	if [ $result = 'false' ]; then
+		log 'xdotool is not installed'
 		exit 1
 	fi
 
 	if [ ! -f "$install_dir/gestures.js" ]; then
+		log 'leapmotion-dbus is not installed'
 		exit 1
 	fi	
 
-	# checkCommandExists "notReal" result
-	# if [ $result = 'false' ]; then
-	# 	exit 1
-	# fi
+	checkCommandExists "notReal" result
+	if [ $result = 'false' ]; then
+		log 'notReal is not installed'
+		exit 1
+	fi
 
 	exit 0
 elif [ $1 = 'update_check' ]; then
+	log 'Checking for updates'
 
 	if [ ! -d "$install_dir" ]; then
 		exit 0
@@ -286,14 +319,20 @@ elif [ $1 = 'update_check' ]; then
 
 	cd "$install_dir"
 
-	git fetch > /dev/null 2>&1
+	#git fetch > /dev/null 2>&1
+
+	git fetch
 
 	DIFF_COUNT=$(git rev-list HEAD...origin/master --count @)
 
+	log "$DIFF_COUNT differences found"
+
 	exit $DIFF_COUNT
 elif [ $1 = 'install_updates' ]; then
+	log 'Installing updates'
 
 	if [ ! -d "$install_dir" ]; then
+		log "The directory $install_dir does not exist it looks like leapmotion-dbus is not installed"
 		exit 1
 	fi
 
@@ -301,6 +340,10 @@ elif [ $1 = 'install_updates' ]; then
 
 	GIT_RESULT=$(git pull origin master)
 
+	exit 0
+elif [ $1 = 'post_update_tasks' ]; then	
+	version_num=$2	
+	log "Running post update tasks for version $version_num"
 	exit 0
 elif [ $1 = 'start_service' ]; then
 

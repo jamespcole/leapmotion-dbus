@@ -20,10 +20,11 @@ const PanelMenu = imports.ui.panelMenu;
 const ModalDialog = imports.ui.modalDialog;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 
+const VersionNum = '1.0.0';
+
 
 let text, button, winInjections, workspaceInjections, workViewInjections, createdActors, connectedSignals; //actors
 let logToConsole, logToUI, enablePointing, numberOfPointingFingers, showAdvancedMenuItems; //settings
-let isUpToDate, isInstallReguired, isServiceRunning, isLeapMotionConnected; //state info
 let leapMotionManager;
 
 function resetState() {
@@ -38,15 +39,9 @@ function resetState() {
     numberOfPointingFingers = 1;
     showAdvancedMenuItems = true;
 
-    //set the states to default values
-    isUpToDate = false;
-    isInstallReguired = false;
-    isServiceRunning = false;
-    isLeapMotionConnected = false;
-
-    if(leapMotionManager) {
+    /*if(leapMotionManager) {
       leapMotionManager.destroy();
-    }
+    }*/
     leapMotionManager = new LeapMotionManager();
 };
 
@@ -85,6 +80,7 @@ const LeapMotionMenu = new Lang.Class({
     Name: 'LeapMotionMenu.LeapMotionMenu',
     Extends: PanelMenu.Button,
     StatusIcon: null,
+    _icons: [],
     _init: function() {
       this.parent(0.0, _("LeapMotion"));
 
@@ -158,12 +154,16 @@ const LeapMotionMenu = new Lang.Class({
         }));
       this.menu.addMenuItem(this._stopServiceItem);      
 
+      this.StatusIcon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
+                                   style_class: 'system-status-icon' });     
+
+      this.actor.add_child(this.StatusIcon);
+      this.actor.show();
+      this.render();
+
       leapMotionManager.updateListeners.push(Lang.bind(this, function(manager) {
         this.render();
       }));
-
-      this.actor.show();
-      this.render();
     },
 
     destroy: function() {
@@ -171,6 +171,7 @@ const LeapMotionMenu = new Lang.Class({
     },
 
     render: function() {
+      
       if(leapMotionManager.isUpToDate) {
         this._updateServiceItem.actor.hide();        
       }
@@ -212,47 +213,29 @@ const LeapMotionMenu = new Lang.Class({
         this._advancedOptionsSeparator.actor.show();
       }
 
-      if(this.StatusIcon) {
-        this.actor.remove_child(this.StatusIcon);
-      }
-
+      let icon_name;
       if(leapMotionManager.isInstallingUpdates) {        
-        let icon = new St.Icon({ icon_name: 'document-save-symbolic',
-                                   style_class: 'system-status-icon' });
-        this.StatusIcon = icon;
-        this.actor.add_child(this.StatusIcon);
+        icon_name = 'document-save-symbolic';        
       }
       else if(leapMotionManager.isInstallRunning) {        
-        let icon = new St.Icon({ icon_name: 'emblem-synchronizing-symbolic',
-                                   style_class: 'system-status-icon' });
-        this.StatusIcon = icon;
-        this.actor.add_child(this.StatusIcon);
+        icon_name = 'emblem-synchronizing-symbolic';        
       }
       else {
-        if(leapMotionManager.isLeapMotionConnected) {          
-          let icon = new St.Icon({ icon_name: 'emblem-system-symbolic',
-                                   style_class: 'system-status-icon' });
-          this.StatusIcon = icon;
-          this.actor.add_child(this.StatusIcon);
+        if(leapMotionManager.isLeapMotionConnected) {      
+          icon_name = 'emblem-system-symbolic';            
         }
         else {
 
           if(leapMotionManager.isServiceRunning) {
-            let icon = new St.Icon({ icon_name: 'system-run-symbolic',
-                                   style_class: 'system-status-icon' });
-            this.StatusIcon = icon;
-            this.actor.add_child(this.StatusIcon);
+            icon_name = 'system-run-symbolic';       
           }
           else {
-            let icon = new St.Icon({ icon_name: 'action-unavailable-symbolic',
-                                   style_class: 'system-status-icon' });
-            this.StatusIcon = icon;
-            this.actor.add_child(this.StatusIcon);
-
-            this._startServiceItem.actor.show();  
+            icon_name = 'action-unavailable-symbolic';          
           }          
         }
-      }      
+      }  
+
+      this.StatusIcon.icon_name = icon_name;
     }
     
 });
@@ -291,7 +274,7 @@ function removeInjection(object, injection, name) {
 }
 
 function disable() {
-    Main.panel._rightBox.remove_child(button);
+    //Main.panel._rightBox.remove_child(button);
 
     let i;
 
@@ -749,6 +732,10 @@ const LeapDBusEventSource = new Lang.Class({
           Main.notify('LeapMotion', 'LeapMotion has been disconnected');
         }                
       }
+    },
+
+    destroy: function() {
+        this._dbusProxy.run_dispose();
     }
   
 });
@@ -917,27 +904,55 @@ const LeapMotionManager = new Lang.Class({
     installUpdates: function(callback) {
       this.isInstallingUpdates = true;
       this.sendUpdates();
-      this.runHelper('install_updates', Lang.bind(this, function(success) {
+      this.runHelper('install_updates', Lang.bind(this, function(success) {        
           if (!success) {
             if(callback) {
               callback(false);
             }
           }            
           else {
-            this.checkForUpdates(function(upToDate) {              
-              if(callback) {        
-                callback(upToDate);                
-              }
-            }); 
+            this.doPostUpdateTasks(Lang.bind(this, function(success) { 
+              this.checkForUpdates(function(upToDate) {                            
+                if(callback) {        
+                  callback(upToDate);                
+                }
+              }); 
+
+            }));
+            
           }
           this.isInstallingUpdates = false;
           this.sendUpdates();
       }));
     },
 
-    runHelper: function(name, callback) {
+    doPostUpdateTasks: function(callback) {            
+      let args = Array();
+      args.push('post_update_tasks');
+      args.push(VersionNum);
+      this.runHelper(args, Lang.bind(this, function(success) {
+          if(callback) {
+            callback(success);
+          }          
+      }));
+    },
+
+    runHelper: function(args, callback) {
+      let params = [];
+
+      params.push(Me.path + '/helpers.sh');
+
+      if(args instanceof Array) {        
+        for(let i = 0; i < args.length;i++) {
+          params.push(args[i]);
+        }
+      }
+      else {        
+        params.push(args);
+      }
+      
       let [success, pid] = GLib.spawn_async(Me.path,
-            [Me.path + '/helpers.sh', name],
+            params,
             null,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);
@@ -977,24 +992,29 @@ const LeapMotionManager = new Lang.Class({
       Util.spawn([Me.path + '/helpers.sh', 'start_service']);
       //this is a long running process so we can't wait 
       //but it takes a few seconds to start first
-      if(this._startingTimerId > 0) {
+      if(this._startingTimerId > 0) {                
         Mainloop.source_remove(this._startingTimerId);
         this._startingTimerId = 0;        
       }      
 
       this._startingTimerId = Mainloop.timeout_add_seconds(5, Lang.bind(this,
-            function() {
-                this.checkLeapService(callback);
-                return false;                
+            function() {                
+                  this._startingTimerId = 0; 
+                  this.checkLeapService(callback);
+                return false;                              
             }));
+      //global.log('start service time', this._startingTimerId);
+
     },
 
     startTimer: function() {
-      this._timerId = Mainloop.timeout_add_seconds(120, Lang.bind(this,
-            function() {              
+      this._timerId = Mainloop.timeout_add_seconds(45, Lang.bind(this,
+            function() {                            
               this.checkLeapService();                              
               return true;                
             }));
+      //global.log('start timer time', this._timerId);      
+
     },
 
     checkLeapService: function(callback) {
@@ -1049,7 +1069,7 @@ const LeapMotionManager = new Lang.Class({
           this.setProp('isInstallRunning', running);   
         }                
         if(!running) {
-          if(this._installTimerId > 0) {
+          if(this._installTimerId > 0) {            
             Mainloop.source_remove(this._installTimerId);
             this._installTimerId = 0;        
           }  
@@ -1059,7 +1079,7 @@ const LeapMotionManager = new Lang.Class({
 
     installTimer: function() {
       this._installTimerId = Mainloop.timeout_add_seconds(5, Lang.bind(this,
-            function() {                 
+            function() {                              
               if(this.isInstallRunning) {
                 this.checkInstallRunning();                              
                 return true; 
@@ -1068,6 +1088,7 @@ const LeapMotionManager = new Lang.Class({
                 return false; 
               }                                        
             }));
+      //global.log('start install time', this._installTimerId);          
     },
 
     sendUpdates: function() {
@@ -1083,23 +1104,19 @@ const LeapMotionManager = new Lang.Class({
       }
     },
 
-    destroy: function() {
+    destroy: function() {        
         if (this._timerId > 0) {
             Mainloop.source_remove(this._timerId);
             this._timerId = 0;
-        }
-
-        if(this._startingTimerId > 0) {
+        }    
+        if(this._startingTimerId > 0) {          
           Mainloop.source_remove(this._startingTimerId);
           this._startingTimerId = 0;        
         }  
-
-        if(this._installTimerId > 0) {
+        if(this._installTimerId > 0) {          
           Mainloop.source_remove(this._installTimerId);
           this._installTimerId = 0;        
-        }  
-
-        this.parent();
+        }
     }
 
 });
