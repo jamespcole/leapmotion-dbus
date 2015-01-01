@@ -303,11 +303,11 @@ if [ $1 = 'prereqs_check' ]; then
 		exit 1
 	fi	
 
-	checkCommandExists "notReal" result
-	if [ $result = 'false' ]; then
-		log 'notReal is not installed'
-		exit 1
-	fi
+	# checkCommandExists "notReal" result
+	# if [ $result = 'false' ]; then
+	# 	log 'notReal is not installed'
+	# 	exit 1
+	# fi
 
 	exit 0
 elif [ $1 = 'update_check' ]; then
