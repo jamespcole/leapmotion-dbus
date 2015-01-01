@@ -89,8 +89,11 @@ function install_from_url {
 }
 
 function install_leap_motion {
+	local  __resultvar=$1
 	if command -v leapd >/dev/null 2>&1; then
 		print_info "The leapd command is already installed"
+		local install_result='already_installed'
+		eval $__resultvar="'$install_result'"
 	else
 		print_warning "The leapd command is required but is not installed."
 
@@ -118,6 +121,9 @@ function install_leap_motion {
 
 					print_info "Starting the leapd service..."
 					sudo /etc/init.d/leapd restart
+
+					local install_result='newly_installed'
+					eval $__resultvar="'$install_result'"
 
 					break;;
 				[Nn]* ) tput sgr0; exit;;
@@ -181,23 +187,32 @@ function install_leapmotion_dbus_service {
 
 install_dir=~/.local/share/leapmotion-dbus	
 function install_leapmotion_dbus {
-	
+	local __resultvar=$1
 	if [ ! -d "$install_dir" ]; then
 		print_info "Installing leapmotion-dbus to $install_dir"
 		mkdir -p "$install_dir"
 		print_info "Downloading from git..."
 		git clone https://github.com/jamespcole/leapmotion-dbus.git "$install_dir"
+
+		local install_result='newly_installed'
+		eval $__resultvar="'$install_result'"
 	else
 		print_info "Updating leapmotion-dbus..."
 		print_info "Killing already running processes..."
 		kill $(ps ux -u $USER -U $USER | grep '[g]estures.js' | awk '{print $2}') > /dev/null 2>&1
 		print_info "Downloading latest from git..."
 		(cd "$install_dir" && git pull origin master)
+
+		local install_result='already_installed'
+		eval $__resultvar="'$install_result'"
 	fi
 }
 
 function install_nodejs {
 	require_command_from_repo "nodejs" "nodejs" "ppa:chris-lea/node.js" result
+
+	logInstallResult "nodejs" $result
+
 	if [ ! -f "/usr/bin/node" ]; then
 		print_info "Symlinking /usr/bin/nodejs to /usr/bin/node"
 		sudo ln -s /usr/bin/nodejs /usr/bin/node
@@ -256,9 +271,16 @@ function logsetup {
 }
 logStdErr() { while IFS='' read -r line; do echo "[$(date)]:	 $line"  >> "$LOGFILE"; done; };
 
-# function log {
-#     echo "[$(date)]: $*"
-# }
+function logInstallResult {
+
+	if [ $2 = 'newly_installed' ]; then
+		log "$1 has been installed"
+	elif [ $2 = 'already_installed' ]; then
+		log "$1 was already installed"
+	else
+		log "$1 was not installed"
+	fi
+}
 
 function log {
  echo "[$(date)]:	 $*">>"$LOGFILE"
@@ -396,25 +418,35 @@ elif [ $1 = 'service_running' ]; then
 elif [ $1 = 'install_reqs' ]; then
 	print_success "Installing required components...\n\n"
 
+	log 'Installing required components for Leap Motion integration...'
+
 	require_command "add-apt-repository" "python-software-properties" result
+
+	logInstallResult "add-apt-repository" $result
 
 	install_nodejs
 
+
+
 	require_command "git" "git" result
 
-	install_leap_motion
+	logInstallResult "git" $result
+
+
+
+	install_leap_motion result
+
+	logInstallResult "leapd" $result
+
 
 	require_command "xdotool" "xdotool" result
 
-	#install_global_npm_package "forever" "forever" result
+	logInstallResult "xdotool" $result
 
-	#install_leapmotion_dbus_service
 
-	#print_info "Restarting leapmotion-dbus service..."
+	install_leapmotion_dbus	result
 
-	#sudo /etc/init.d/leapmotion-dbus restart
-
-	install_leapmotion_dbus	
+	logInstallResult "leapmotion_dbus" $result
 
 	print_success "\n\nInstallation complete."
 
