@@ -1008,7 +1008,7 @@ const LeapMotionManager = new Lang.Class({
     },
 
     startTimer: function() {
-      this._timerId = Mainloop.timeout_add_seconds(45, Lang.bind(this,
+      this._timerId = Mainloop.timeout_add_seconds(60, Lang.bind(this,
             function() {                            
               this.checkLeapService();                              
               return true;                

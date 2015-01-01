@@ -345,40 +345,51 @@ elif [ $1 = 'post_update_tasks' ]; then
 	version_num=$2	
 	log "Running post update tasks for version $version_num"
 	exit 0
-elif [ $1 = 'start_service' ]; then
-
+elif [ $1 = 'start_service' ]; then	
+	log "Attempting to start leapmotion-dbus service"
 	if [ ! -f "$install_dir/gestures.js" ]; then
+		log "Could not start service, file does not exist at $install_dir/gestures.js"
 		exit 1
 	fi
 
 	process_count=$(ps ux -u $USER -U $USER | grep '[g]estures.js' | wc -l)	
 	if [ $process_count -eq 0 ]; then
 		cd "$install_dir"
-		node "$install_dir/gestures.js"  
+		node "$install_dir/gestures.js" & 
+		log "Started leapmotion-dbus service"
+	else
+		log "Service is already running"
 	fi
 
 	exit 0
 elif [ $1 = 'stop_service' ]; then
-
+	log "Attempting to stop leapmotion-dbus service"
 	if [ ! -f "$install_dir/gestures.js" ]; then
+		log "Could not stop service, file does not exist at $install_dir/gestures.js"
 		exit 1
 	fi
 	
 	process_count=$(ps ux -u $USER -U $USER | grep '[g]estures.js' | wc -l)	
 	if [ $process_count -ne 0 ]; then		
+		log "Found $process_count leapmotion-dbus service(s) which will be killed now"
 		kill $(ps ux -u $USER -U $USER | grep '[g]estures.js' | awk '{print $2}') > /dev/null 2>&1
+	else
+		log "leapmotion-dbus service is not running"
 	fi
 
 	exit 0
 elif [ $1 = 'service_running' ]; then
-
+	log "Checking if leapmotion-dbus service is running"
 	if [ ! -f "$install_dir/gestures.js" ]; then
 		exit 1
 	fi
 	
 	process_count=$(ps ux -u $USER -U $USER | grep '[g]estures.js' | wc -l)	
 	if [ $process_count -ne 0 ]; then
+		log "$process_count active leapmotion-dbus service(s) are running"
 		exit 0
+	else
+		log "No leapmotion-dbus services found"
 	fi
 
 	exit 1
